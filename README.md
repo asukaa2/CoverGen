@@ -1,15 +1,3 @@
----
-title: AICoverGen
-emoji: 🚀
-colorFrom: red
-colorTo: pink
-sdk: gradio
-sdk_version: 5.44.0
-app_file: app.py
-pinned: false
-license: mit
----
-
 # AICoverGen  
 
 ## Overview  
@@ -18,9 +6,8 @@ Built with ❤️ for music enthusiasts and creators, it allows you to transform
 
 | Description | Link |  
 | ----------- | ---- |  
-| 📙 Colab Notebook | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/R3gm/AICoverGen/blob/main/colab_notebook.ipynb) |  
-| 🎉 Repository | [![GitHub Repository](https://img.shields.io/badge/GitHub-Repository-black?style=flat-square&logo=github)](https://github.com/R3gm/AICoverGen) |  
-| 🚀 Online DEMO | [![Hugging Face Spaces](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Spaces-blue)](https://huggingface.co/spaces/r3gm/AICoverGen) |  
+| 📙 Colab Notebook | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/asukaa2/CoverGen/blob/main/colab_notebook.ipynb) |  
+| 🎉 Repository | [![GitHub Repository](https://img.shields.io/badge/GitHub-Repository-black?style=flat-square&logo=github)](https://github.com/asukaa2/CoverGen) |  
 
 ## Key Functions  
 1. **Voice Models**  

@@ -14,8 +14,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 now_dir = os.path.join(BASE_DIR, 'src')
 sys.path.append(now_dir)
 
-from predictor.FCPE import FCPEF0Predictor
-from predictor.RMVPE import RMVPE
+from predictor.generator import Generator, Autotune, post_process
 
 bh, ah = signal.butter(N=5, Wn=48, btype="high", fs=16000)
 
@@ -37,7 +36,6 @@ def cache_harvest_f0(input_audio_path, fs, f0max, f0min, frame_period):
 
 
 def change_rms(data1, sr1, data2, sr2, rate):
-    # print(data1.max(),data2.max())
     rms1 = librosa.feature.rms(y=data1, frame_length=sr1 // 2 * 2, hop_length=sr1 // 2)
     rms2 = librosa.feature.rms(y=data2, frame_length=sr2 // 2 * 2, hop_length=sr2 // 2)
 
@@ -77,7 +75,17 @@ class VC(object):
         self.t_center = self.sr * self.x_center
         self.t_max = self.sr * self.x_max
         self.device = config.device
-        
+
+        # Initialize the new Generator with the same parameters
+        self.generator = Generator(
+            sample_rate=self.sr,
+            hop_length=self.window,
+            f0_min=50,
+            f0_max=1100,
+            is_half=self.is_half,
+            device=self.device,
+        )
+
         self.ref_freqs = [
             65.41,
             82.41,
@@ -105,12 +113,10 @@ class VC(object):
         note_dict.append(self.ref_freqs[-1])
         return note_dict
 
-    def autotune_f0(self, f0):
-        autotuned_f0 = np.zeros_like(f0)
-        for i, freq in enumerate(f0):
-            closest_note = min(self.note_dict, key=lambda x: abs(x - freq))
-            autotuned_f0[i] = closest_note
-        return autotuned_f0
+    def autotune_f0(self, f0, f0_autotune_strength=1.0):
+        """Autotune f0 using the new Autotune class from generator."""
+        autotune = Autotune(self.note_dict)
+        return autotune.autotune_f0(f0, f0_autotune_strength)
 
     def get_optimal_torch_device(self, index: int = 0) -> torch.device:
         if torch.cuda.is_available():
@@ -118,128 +124,6 @@ class VC(object):
         elif torch.backends.mps.is_available():
             return torch.device("mps")
         return torch.device("cpu")
-
-    def get_f0_crepe_computation(
-        self,
-        x,
-        f0_min,
-        f0_max,
-        p_len,
-        hop_length=160,
-        model="full",
-    ):
-        x = x.astype(np.float32)
-        x /= np.quantile(np.abs(x), 0.999)
-        torch_device = self.get_optimal_torch_device()
-        audio = torch.from_numpy(x).to(torch_device, copy=True)
-        audio = torch.unsqueeze(audio, dim=0)
-        if audio.ndim == 2 and audio.shape[0] > 1:
-            audio = torch.mean(audio, dim=0, keepdim=True).detach()
-        audio = audio.detach()
-        pitch: Tensor = torchcrepe.predict(
-            audio,
-            self.sr,
-            hop_length,
-            f0_min,
-            f0_max,
-            model,
-            batch_size=hop_length * 2,
-            device=torch_device,
-            pad=True,
-        )
-        p_len = p_len or x.shape[0] // hop_length
-        source = np.array(pitch.squeeze(0).cpu().float().numpy())
-        source[source < 0.001] = np.nan
-        target = np.interp(
-            np.arange(0, len(source) * p_len, len(source)) / p_len,
-            np.arange(0, len(source)),
-            source,
-        )
-        f0 = np.nan_to_num(target)
-        return f0
-
-    def get_f0_official_crepe_computation(
-        self,
-        x,
-        f0_min,
-        f0_max,
-        model="full",
-    ):
-        batch_size = 512
-        audio = torch.tensor(np.copy(x))[None].float()
-        f0, pd = torchcrepe.predict(
-            audio,
-            self.sr,
-            self.window,
-            f0_min,
-            f0_max,
-            model,
-            batch_size=batch_size,
-            device=self.device,
-            return_periodicity=True,
-        )
-        pd = torchcrepe.filter.median(pd, 3)
-        f0 = torchcrepe.filter.mean(f0, 3)
-        f0[pd < 0.1] = 0
-        f0 = f0[0].cpu().numpy()
-        return f0
-
-    def get_f0_hybrid_computation(
-        self,
-        methods_str,
-        input_audio_path,
-        x,
-        f0_min,
-        f0_max,
-        p_len,
-        filter_radius,
-        crepe_hop_length,
-        time_step,
-    ):
-        methods_str = re.search("hybrid\[(.+)\]", methods_str)
-        if methods_str:
-            methods = [method.strip() for method in methods_str.group(1).split("+")]
-        f0_computation_stack = []
-        print(f"Calculating f0 pitch estimations for methods {str(methods)}")
-        x = x.astype(np.float32)
-        x /= np.quantile(np.abs(x), 0.999)
-        for method in methods:
-            f0 = None
-            if method == "mangio-crepe":
-                f0 = self.get_f0_crepe_computation(
-                    x, f0_min, f0_max, p_len, crepe_hop_length
-                )
-            elif method == "rmvpe":
-                if hasattr(self, "model_rmvpe") == False:
-
-                    self.model_rmvpe = RMVPE(
-                        os.path.join(BASE_DIR, 'rvc_models', 'rmvpe.pt'), is_half=self.is_half, device=self.device
-                    )
-                f0 = self.model_rmvpe.infer_from_audio(x, thred=0.03)
-                f0 = f0[1:]
-            elif method == "fcpe":
-                self.model_fcpe = FCPEF0Predictor(
-                    os.path.join(BASE_DIR, 'rvc_models', 'fcpe.pt'),
-                    f0_min=int(f0_min),
-                    f0_max=int(f0_max),
-                    dtype=torch.float32,
-                    device=self.device,
-                    sampling_rate=self.sr,
-                    threshold=0.03,
-                )
-                f0 = self.model_fcpe.compute_f0(x, p_len=p_len)
-                del self.model_fcpe
-                gc.collect()
-            f0_computation_stack.append(f0)
-
-        print(f"Calculating hybrid median f0 from the stack of {str(methods)}")
-        f0_computation_stack = [fc for fc in f0_computation_stack if fc is not None]
-        f0_median_hybrid = None
-        if len(f0_computation_stack) == 1:
-            f0_median_hybrid = f0_computation_stack[0]
-        else:
-            f0_median_hybrid = np.nanmedian(f0_computation_stack, axis=0)
-        return f0_median_hybrid
 
     def get_f0(
         self,
@@ -257,130 +141,41 @@ class VC(object):
     ):
         global input_audio_path2wav
         time_step = self.window / self.sr * 1000
-        #f0_min = 50
-        #f0_max = 1100
         f0_mel_min = 1127 * np.log(1 + f0_min / 700)
         f0_mel_max = 1127 * np.log(1 + f0_max / 700)
-        if f0_method == "pm":
-            f0 = (
-                parselmouth.Sound(x, self.sr)
-                .to_pitch_ac(
-                    time_step=time_step / 1000,
-                    voicing_threshold=0.6,
-                    pitch_floor=f0_min,
-                    pitch_ceiling=f0_max,
-                )
-                .selected_array["frequency"]
-            )
-            pad_size = (p_len - len(f0) + 1) // 2
-            if pad_size > 0 or p_len - len(f0) - pad_size > 0:
-                f0 = np.pad(f0, [[pad_size, p_len - len(f0) - pad_size]], mode="constant")
-        
-        elif f0_method == "harvest":
-            input_audio_path2wav[input_audio_path] = x.astype(np.double)
-            f0 = cache_harvest_f0(input_audio_path, self.sr, f0_max, f0_min, 10)
-            if int(filter_radius) > 2:
-                f0 = signal.medfilt(f0, 3)
-        
-        elif f0_method == "dio":
-            f0, t = pyworld.dio(
-                x.astype(np.double),
-                fs=self.sr,
-                f0_ceil=f0_max,
-                f0_floor=f0_min,
-                frame_period=10,
-            )
-            f0 = pyworld.stonemask(x.astype(np.double), f0, t, self.sr)
-            f0 = signal.medfilt(f0, 3)
-        
-        elif f0_method == "mangio-crepe":
-            f0 = self.get_f0_crepe_computation(x, f0_min, f0_max, p_len, crepe_hop_length)
-        
-        elif f0_method == "rmvpe":
-            if hasattr(self, "model_rmvpe") == False:
 
-                self.model_rmvpe = RMVPE(
-                    os.path.join(BASE_DIR, 'rvc_models', 'rmvpe.pt'), is_half=self.is_half, device=self.device
-                )
-            f0 = self.model_rmvpe.infer_from_audio(x, thred=0.03)
-        
-        elif f0_method == "rmvpe+":
-            params = {'x': x, 'p_len': p_len, 'f0_up_key': f0_up_key, 'f0_min': f0_min, 
-                      'f0_max': f0_max, 'time_step': time_step, 'filter_radius': filter_radius, 
-                      'crepe_hop_length': crepe_hop_length, 'model': "full"
-                      }
-            f0 = self.get_pitch_dependant_rmvpe(**params)
-        
-        elif f0_method == "fcpe":
-            self.model_fcpe = FCPEF0Predictor(
-                os.path.join(BASE_DIR, 'rvc_models', 'fcpe.pt'),
-                f0_min=int(f0_min),
-                f0_max=int(f0_max),
-                dtype=torch.float32,
-                device=self.device,
-                sampling_rate=self.sr,
-                threshold=0.03,
-            )
-            f0 = self.model_fcpe.compute_f0(x, p_len=p_len)
-            del self.model_fcpe
-            gc.collect()
-        
-        elif "hybrid" in f0_method:
-            input_audio_path2wav[input_audio_path] = x.astype(np.double)
-            f0 = self.get_f0_hybrid_computation(
-                f0_method,
-                input_audio_path,
-                x,
-                f0_min,
-                f0_max,
-                p_len,
-                filter_radius,
-                crepe_hop_length,
-                time_step,
-            )
+        # Use the new Generator's calculator for all f0 methods
+        f0_coarse, f0bak = self.generator.calculator(
+            f0_method=f0_method,
+            x=x,
+            f0_up_key=f0_up_key,
+            p_len=p_len,
+            filter_radius=filter_radius,
+            f0_autotune=(f0autotune == "True"),
+            f0_autotune_strength=1.0,
+        )
 
-        print("f0_autotune =", f0autotune)
-        if f0autotune == "True":
-            f0 = self.autotune_f0(f0)
-
-        f0 *= pow(2, f0_up_key / 12)
-        tf0 = self.sr // self.window
+        # Handle inp_f0 replacement if provided
         if inp_f0 is not None:
+            tf0 = self.sr // self.window
             delta_t = np.round(
                 (inp_f0[:, 0].max() - inp_f0[:, 0].min()) * tf0 + 1
             ).astype("int16")
             replace_f0 = np.interp(
                 list(range(delta_t)), inp_f0[:, 0] * 100, inp_f0[:, 1]
             )
-            shape = f0[self.x_pad * tf0 : self.x_pad * tf0 + len(replace_f0)].shape[0]
-            f0[self.x_pad * tf0 : self.x_pad * tf0 + len(replace_f0)] = replace_f0[
-                :shape
-            ]
-        f0bak = f0.copy()
-        f0_mel = 1127 * np.log(1 + f0 / 700)
-        f0_mel[f0_mel > 0] = (f0_mel[f0_mel > 0] - f0_mel_min) * 254 / (
-            f0_mel_max - f0_mel_min
-        ) + 1
-        f0_mel[f0_mel <= 1] = 1
-        f0_mel[f0_mel > 255] = 255
-        f0_coarse = np.rint(f0_mel).astype(np.int_)
+            shape = f0bak[self.x_pad * tf0 : self.x_pad * tf0 + len(replace_f0)].shape[0]
+            f0bak[self.x_pad * tf0 : self.x_pad * tf0 + len(replace_f0)] = replace_f0[:shape]
+            # Recompute f0_coarse after replacement
+            f0_coarse, f0bak = post_process(
+                f0bak.copy() / pow(2, f0_up_key / 12),  # undo the pitch shift
+                f0_up_key,
+                f0_mel_min,
+                f0_mel_max,
+            )
 
         return f0_coarse, f0bak
 
-    def get_pitch_dependant_rmvpe(self, x, f0_min=1, f0_max=40000, *args, **kwargs):
-        if not hasattr(self, "model_rmvpe"):
-            
-            self.model_rmvpe = RMVPE(
-                os.path.join(BASE_DIR, 'rvc_models', 'rmvpe.pt'),
-                is_half=self.is_half,
-                device=self.device,
-            )
-            
-        f0 = self.model_rmvpe.infer_from_audio_with_pitch(x, thred=0.03, f0_min=f0_min, f0_max=f0_max)   
-            
-        return f0
-
-    
     def vc(
         self,
         model,

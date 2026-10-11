@@ -11,7 +11,7 @@ import soundfile as sf
 import torch.nn.functional as F
 
 # Absolute directory that stores downloaded predictor/embedder files (independent of CWD).
-MODELS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'models')
+MODELS_DIR = os.path.join(os.getcwd(), 'models')
 
 PREDICTOR_DOWNLOAD_LINK = codecs.decode("uggcf://uhttvatsnpr.pb/NauC/Ivrganzrfr-EIP-Cebwrpg/erfbyir/znva/cerqvpgbef/", "rot13")
 EMBEDDER_DOWNLOAD_LINK = codecs.decode("uggcf://uhttvatsnpr.pb/NauC/Ivrganzrfr-EIP-Cebwrpg/erfbyir/znva/rzorqqref/", "rot13") + "fairseq/"

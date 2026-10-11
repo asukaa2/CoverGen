@@ -12,8 +12,6 @@ import torch.nn.functional as F
 
 sys.path.append(os.getcwd())
 
-from modules import opencl
-
 def change_rms(source_audio, source_rate, target_audio, target_rate, rate):
     rms2 = F.interpolate(torch.from_numpy(librosa.feature.rms(y=target_audio, frame_length=target_rate // 2 * 2, hop_length=target_rate // 2)).float().unsqueeze(0), size=target_audio.shape[0], mode="linear").squeeze()
     return (target_audio * (torch.pow(F.interpolate(torch.from_numpy(librosa.feature.rms(y=source_audio, frame_length=source_rate // 2 * 2, hop_length=source_rate // 2)).float().unsqueeze(0), size=target_audio.shape[0], mode="linear").squeeze(), 1 - rate) * torch.pow(torch.maximum(rms2, torch.zeros_like(rms2) + 1e-6), rate - 1)).numpy())
@@ -23,7 +21,6 @@ def clear_gpu_cache():
 
     if torch.cuda.is_available(): torch.cuda.empty_cache()
     elif torch.backends.mps.is_available(): torch.mps.empty_cache()
-    elif opencl.is_available(): opencl.pytorch_ocl.empty_cache()
 
 def HF_download_file(url, output_path=None):
     url = url.replace("/blob/", "/resolve/").replace("?download=true", "").strip()

@@ -179,15 +179,16 @@ def preprocess_song(song_input, mdx_model_params, song_id, is_webui, input_type,
 
 
 def voice_change(voice_model, vocals_path, output_path, pitch_change, f0_method, index_rate, filter_radius, rms_mix_rate, protect, crepe_hop_length, f0autotune, f0_min, f0_max, is_webui):
+    hubert_model = "hubert_base"
     rvc_model_path, rvc_index_path = get_rvc_model(voice_model, is_webui)
-    device = 'cuda:0'
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     config = Config(device, True)
-    hubert_model = load_hubert(device, config.is_half, os.path.join(rvc_models_dir, 'hubert_base.pt'))
+    
     cpt, version, net_g, tgt_sr, vc = get_vc(device, config.is_half, config, rvc_model_path)
 
     rvc_infer(rvc_index_path, index_rate, vocals_path, output_path, pitch_change, f0_method, cpt, version, net_g, 
               filter_radius, tgt_sr, rms_mix_rate, protect, crepe_hop_length, vc, hubert_model, f0autotune, f0_min, f0_max)
-    del hubert_model, cpt
+    
     gc.collect()
 
 

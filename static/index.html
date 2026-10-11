@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>CoverGen — AI Song Cover Generator</title>
     <link rel="icon" href="/favicon.ico" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
@@ -18,9 +21,14 @@
                 <p>AI Song Cover Generator</p>
             </div>
         </div>
-        <div class="conn-status" id="connStatus">
-            <span class="dot" id="connDot"></span>
-            <span id="connText">Connecting…</span>
+        <div class="topbar-actions">
+            <div class="conn-status" id="connStatus">
+                <span class="dot" id="connDot"></span>
+                <span id="connText">Connecting…</span>
+            </div>
+            <button class="theme-toggle" id="themeToggle" type="button" title="Toggle light / dark theme" aria-label="Toggle theme">
+                <span id="themeIcon">☾</span>
+            </button>
         </div>
     </header>
 
@@ -180,7 +188,7 @@
                 <div class="cover-card">
                     <div class="cover-label">AI Cover</div>
                     <audio id="coverPlayer" controls preload="metadata"></audio>
-                    <a class="btn btn-ghost btn-dl" id="coverDownload" download>⤓ Download</a>
+                    <a class="btn btn-ghost btn-dl" id="coverDownload" download>⤓ Download cover</a>
                 </div>
 
                 <details class="stems">
@@ -227,7 +235,7 @@
     </div>
 
     <footer class="footer">
-        <p>CoverGen · MDX-Net separation + RVC voice conversion · backend: Python + gradio.Server · frontend: vanilla HTML/CSS/JS</p>
+        <p>CoverGen · MDX-Net separation + RVC voice conversion · backend: Python + gradio.Server · frontend: vanilla HTML/CSS/JS · POST /api/cover returns raw audio</p>
     </footer>
 
     <script type="module" src="/static/app.js"></script>

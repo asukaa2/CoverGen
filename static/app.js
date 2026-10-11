@@ -1,16 +1,19 @@
 /* ============================================================
    CoverGen frontend logic
-   Talks to the Python gradio.Server backend through the official
-   Gradio JS client (@gradio/client), so every request goes through
-   the backend's queueing engine (concurrency + SSE progress).
+   Talks to the Python gradio.Server backend over plain REST:
+   - POST /api/cover  -> the response body IS the audio file
+     (audio/mpeg | audio/flac | audio/wav) - never JSON. It is
+     turned into a blob URL and fed straight to the player.
+   - GET  /api/models -> JSON list (metadata only)
+   - POST /api/models/download | /api/models/upload
+   Stems are fetched from /song_output/<file> (real audio files).
    ============================================================ */
-
-import { Client, handle_file } from "https://cdn.jsdelivr.net/npm/@gradio/client/dist/index.min.js";
 
 /* ---------------- element handles ---------------- */
 const $ = (id) => document.getElementById(id);
 
 const el = {
+    themeToggle: $("themeToggle"), themeIcon: $("themeIcon"),
     connDot: $("connDot"), connText: $("connText"),
     tabUrl: $("tabUrl"), tabUpload: $("tabUpload"),
     bodyUrl: $("bodyUrl"), bodyUpload: $("bodyUpload"),
@@ -43,14 +46,40 @@ const el = {
     modalMsg: $("modalMsg"),
 };
 
-let client = null;          // gradio JS client
 let uploadedFile = null;    // File object chosen by the user (upload tab)
 let generating = false;
+
+/* ---------------- theme (light / dark) ---------------- */
+const THEME_KEY = "covergen-theme";
+
+function applyTheme(theme) {
+    document.documentElement.setAttribute("data-theme", theme);
+    if (el.themeIcon) el.themeIcon.textContent = theme === "dark" ? "☀" : "☾";
+    try { localStorage.setItem(THEME_KEY, theme); } catch (_) { /* private mode */ }
+}
+
+function initTheme() {
+    let saved = null;
+    try { saved = localStorage.getItem(THEME_KEY); } catch (_) {}
+    if (saved !== "light" && saved !== "dark") {
+        // No stored preference: follow the OS setting (defaults to light).
+        const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+        saved = prefersDark ? "dark" : "light";
+    }
+    applyTheme(saved);
+}
+
+el.themeToggle?.addEventListener("click", () => {
+    const current = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+    applyTheme(current === "dark" ? "light" : "dark");
+});
+initTheme();
 
 /* ---------------- connection ---------------- */
 async function connect() {
     try {
-        client = await Client.connect(window.location.origin);
+        const res = await fetch("/api/models");
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         el.connDot.classList.add("ok");
         el.connText.textContent = "Connected";
         await loadModels();
@@ -62,16 +91,12 @@ async function connect() {
 }
 
 /* ---------------- models ---------------- */
-function unwrapData(msg) {
-    const data = msg?.data ?? msg ?? [];
-    return Array.isArray(data[0]) ? data[0] : data;
-}
-
 async function loadModels() {
-    if (!client) return;
     try {
-        const result = await client.predict("/get_models", {});
-        const models = unwrapData(result).filter(Boolean);
+        const res = await fetch("/api/models");
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const models = (data.models ?? []).filter(Boolean);
         el.voiceModel.innerHTML = "";
         if (models.length === 0) {
             el.voiceModel.innerHTML = '<option value="">— no models installed —</option>';
@@ -173,33 +198,47 @@ function clearStatus() {
 /* ---------------- generate ---------------- */
 el.generateBtn.addEventListener("click", generateCover);
 
-function buildPayload() {
+function buildFormData() {
     const useUpload = el.tabUpload.classList.contains("active") && uploadedFile;
-    const payload = {
-        voice_model: el.voiceModel.value,
-        song_input: useUpload ? "" : el.songInput.value.trim(),
-        pitch: Number(el.pitch.value),
-        keep_files: el.keepFiles.checked,
-        main_gain: Number(el.mainGain.value),
-        backup_gain: Number(el.backupGain.value),
-        inst_gain: Number(el.instGain.value),
-        index_rate: Number(el.indexRate.value),
-        filter_radius: Number(el.filterRadius.value),
-        rms_mix_rate: Number(el.rmsMixRate.value),
-        f0_method: el.f0Method.value,
-        crepe_hop_length: Number(el.crepeHop.value),
-        protect: Number(el.protect.value),
-        output_format: el.outputFormat.value,
-        f0autotune: el.f0Autotune.checked,
-        f0_min: Number(el.f0Min.value),
-        f0_max: Number(el.f0Max.value),
-    };
-    if (useUpload) payload.audio_file = handle_file(uploadedFile);
-    return payload;
+    const form = new FormData();
+    form.append("voice_model", el.voiceModel.value);
+    form.append("song_input", useUpload ? "" : el.songInput.value.trim());
+    form.append("pitch", String(Number(el.pitch.value)));
+    form.append("keep_files", String(el.keepFiles.checked));
+    form.append("main_gain", String(Number(el.mainGain.value)));
+    form.append("backup_gain", String(Number(el.backupGain.value)));
+    form.append("inst_gain", String(Number(el.instGain.value)));
+    form.append("index_rate", String(Number(el.indexRate.value)));
+    form.append("filter_radius", String(Number(el.filterRadius.value)));
+    form.append("rms_mix_rate", String(Number(el.rmsMixRate.value)));
+    form.append("f0_method", el.f0Method.value);
+    form.append("crepe_hop_length", String(Number(el.crepeHop.value)));
+    form.append("protect", String(Number(el.protect.value)));
+    form.append("output_format", el.outputFormat.value);
+    form.append("f0autotune", String(el.f0Autotune.checked));
+    form.append("f0_min", String(Number(el.f0Min.value)));
+    form.append("f0_max", String(Number(el.f0Max.value)));
+    if (useUpload) form.append("audio_file", uploadedFile);
+    return form;
+}
+
+function revokeIfBlob(url) {
+    if (url && url.startsWith("blob:")) URL.revokeObjectURL(url);
+}
+
+function parseStemHeader(headerValue) {
+    // The X-Stems header carries a URL-encoded JSON array of stem URLs.
+    if (!headerValue) return [];
+    try {
+        const parsed = JSON.parse(decodeURIComponent(headerValue));
+        return Array.isArray(parsed) ? parsed : [];
+    } catch (_) {
+        return [];
+    }
 }
 
 async function generateCover() {
-    if (!client || generating) return;
+    if (generating) return;
 
     const useUpload = el.tabUpload.classList.contains("active") && uploadedFile;
     if (!useUpload && !el.songInput.value.trim()) {
@@ -218,27 +257,48 @@ async function generateCover() {
     setStatus("Starting pipeline…");
     el.emptyState.classList.add("hidden");
 
-    try {
-        const job = client.submit("/generate_cover", buildPayload());
+    // Release the previous blob URLs once new audio replaces them.
+    const oldCover = el.coverPlayer.src;
+    const oldStems = [el.stemConverted.src, el.stemDereverb.src, el.stemBackup.src, el.stemInstrumental.src];
 
-        for await (const msg of job) {
-            if (msg.type === "status") {
-                if (msg.stage === "error") {
-                    const m = typeof msg.message === "string" ? msg.message : JSON.stringify(msg.message);
-                    throw new Error(m || "Generation failed.");
-                }
-                if (msg.stage === "pending" && msg.position != null && msg.position >= 0) {
-                    setStatus(`Queued — position ${msg.position}${msg.eta ? ` · eta ${Math.round(msg.eta)}s` : ""}`);
-                } else if (msg.stage === "generating") {
-                    setStatus("Processing… separating vocals, converting voice, mixing.");
-                } else if (msg.stage === "complete") {
-                    setStatus("Finalizing…");
-                }
-            } else if (msg.type === "data") {
-                renderResults(msg.data);
-            }
+    try {
+        setStatus("Uploading & queuing — separation, voice conversion and mixing take a few minutes…");
+        const response = await fetch("/api/cover", { method: "POST", body: buildFormData() });
+
+        if (!response.ok) {
+            // Error responses are small JSON messages with a human-readable reason.
+            let message = `Generation failed (HTTP ${response.status}).`;
+            try {
+                const errData = await response.json();
+                if (errData?.message) message = errData.message;
+            } catch (_) { /* body was not JSON */ }
+            throw new Error(message);
         }
-        clearStatus();
+
+        // === THE RESPONSE IS THE AUDIO ITSELF ===
+        const blob = await response.blob();
+        if (!blob.type.startsWith("audio/")) {
+            throw new Error(`Backend returned ${blob.type || "unknown type"} instead of audio.`);
+        }
+        const coverUrl = URL.createObjectURL(blob);
+        const filename = decodeURIComponent(response.headers.get("X-Output-Filename") ?? "ai_cover");
+
+        el.coverPlayer.src = coverUrl;
+        el.coverDownload.href = coverUrl;
+        el.coverDownload.setAttribute("download", filename);
+        el.resultBody.classList.remove("hidden");
+
+        // Stems are real audio files served from /song_output/.
+        const stems = parseStemHeader(response.headers.get("X-Stems"));
+        const stemMap = [el.stemConverted, el.stemDereverb, el.stemBackup, el.stemInstrumental];
+        stemMap.forEach((audioEl, i) => { audioEl.src = stems[i] ?? ""; });
+
+        revokeIfBlob(oldCover);
+        oldStems.forEach(revokeIfBlob);
+
+        setStatus(`Done — ${filename}`);
+        el.resultBody.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        el.coverPlayer.play().catch(() => { /* autoplay blocked until user interacts */ });
     } catch (err) {
         clearStatus();
         el.emptyState.classList.remove("hidden");
@@ -248,36 +308,10 @@ async function generateCover() {
         generating = false;
         el.generateBtn.disabled = !el.voiceModel.value;
         el.btnLabel.textContent = "Generate AI Cover";
+        if (el.statusBar.classList.contains("hidden") === false && el.statusText.textContent.startsWith("Done")) {
+            setTimeout(clearStatus, 4000);
+        }
     }
-}
-
-function fileUrl(item) {
-    return item?.url ?? (item?.path ? `/file=${item.path}` : null);
-}
-
-function renderResults(data) {
-    const files = Array.isArray(data?.[0]) ? data[0] : (Array.isArray(data) ? data : []);
-    if (files.length === 0) return;
-
-    const [cover, converted, dereverb, backup, instrumental] = files;
-    const coverUrl = fileUrl(cover);
-    if (coverUrl) {
-        el.coverPlayer.src = coverUrl;
-        el.coverDownload.href = coverUrl;
-        el.coverDownload.setAttribute("download", cover?.path?.split("/").pop() ?? "ai_cover");
-        el.resultBody.classList.remove("hidden");
-    }
-    const stemMap = [
-        [converted, el.stemConverted],
-        [dereverb, el.stemDereverb],
-        [backup, el.stemBackup],
-        [instrumental, el.stemInstrumental],
-    ];
-    stemMap.forEach(([item, audioEl]) => {
-        const url = fileUrl(item);
-        audioEl.src = url ?? "";
-    });
-    el.resultBody.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
 /* ---------------- model manager modal ---------------- */
@@ -305,9 +339,14 @@ el.dlModelBtn.addEventListener("click", async () => {
     el.dlModelBtn.disabled = true;
     showModalMsg("Downloading… this can take a while depending on the file size.", true);
     try {
-        const result = await client.predict("/download_online_model", { url, dir_name: name });
-        showModalMsg(unwrapData(result)[0] ?? "Model downloaded!", true);
-        el.modelUrl.value = ""; el.modelName.value = "";
+        const res = await fetch("/api/models/download", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({ url, dir_name: name }),
+        });
+        const data = await res.json();
+        showModalMsg(data.message ?? (data.ok ? "Model downloaded!" : "Download failed."), !!data.ok);
+        if (data.ok) { el.modelUrl.value = ""; el.modelName.value = ""; }
         await loadModels();
     } catch (err) {
         showModalMsg(err.message ?? String(err), false);
@@ -323,9 +362,13 @@ el.upModelBtn.addEventListener("click", async () => {
     el.upModelBtn.disabled = true;
     showModalMsg("Uploading…", true);
     try {
-        const result = await client.predict("/upload_local_model", { zip_file: handle_file(file), dir_name: name });
-        showModalMsg(unwrapData(result)[0] ?? "Model uploaded!", true);
-        el.zipUpload.value = ""; el.zipName.value = "";
+        const res = await fetch(`/api/models/upload?dir_name=${encodeURIComponent(name)}`, {
+            method: "POST",
+            body: file,               // raw zip bytes as the request body
+        });
+        const data = await res.json();
+        showModalMsg(data.message ?? (data.ok ? "Model uploaded!" : "Upload failed."), !!data.ok);
+        if (data.ok) { el.zipUpload.value = ""; el.zipName.value = ""; }
         await loadModels();
     } catch (err) {
         showModalMsg(err.message ?? String(err), false);

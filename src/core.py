@@ -17,8 +17,8 @@ import yt_dlp
 
 from pydub import AudioSegment
 
-from mdx import run_mdx
-from rvc import Config, load_hubert, get_vc, rvc_infer
+from infer.mdx import run_mdx
+from infer.infer import Config, load_hubert, get_vc, rvc_infer
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 

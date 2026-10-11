@@ -14,7 +14,7 @@ from predictor.PYWORLD import PYWORLD
 from predictor.CREPE import CREPE, mean, median
 
 # Absolute directory that stores predictor/embedder model files (independent of CWD).
-MODELS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'models')
+MODELS_DIR = os.path.join(os.path.dirname(os.getcwd(), 'models')
 
 
 

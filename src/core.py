@@ -15,13 +15,6 @@ import soundfile as sf
 import sox
 import yt_dlp
 
-from pedalboard import (
-    Pedalboard, Reverb, Compressor, HighpassFilter, 
-    LowShelfFilter, HighShelfFilter, Limiter, Delay, 
-    NoiseGate, Distortion, Chorus, Clipping
-    )
-
-from pedalboard.io import AudioFile
 from pydub import AudioSegment
 
 from mdx import run_mdx
@@ -93,7 +86,7 @@ def get_rvc_model(voice_model, is_webui):
             rvc_index_filename = file
 
     if rvc_model_filename is None:
-        error_msg = f'В каталоге {model_dir} отсутствует файл модели.'
+        error_msg = f'The directory {model_dir} is missing a model file.'
         raise_exception(error_msg, is_webui)
 
     return os.path.join(model_dir, rvc_model_filename), os.path.join(model_dir, rvc_index_filename) if rvc_index_filename else ''
@@ -161,7 +154,7 @@ def display_progress(message, percent, is_webui, progress=None):
 def preprocess_song(song_input, mdx_model_params, song_id, is_webui, input_type, progress=None):
     keep_orig = False
     if input_type == 'yt':
-        display_progress('[~] Загрузка песни...', 0, is_webui, progress)
+        display_progress('[~] Downloading song...', 0, is_webui, progress)
         song_link = song_input.split('&')[0]
         orig_song_path = yt_download(song_link)
     elif input_type == 'local':
@@ -173,13 +166,13 @@ def preprocess_song(song_input, mdx_model_params, song_id, is_webui, input_type,
     song_output_dir = os.path.join(output_dir, song_id)
     orig_song_path = convert_to_stereo(orig_song_path)
 
-    display_progress('[~] Отделение вокала от инструментала...', 0.1, is_webui, progress)
+    display_progress('[~] Separating vocals from instrumental...', 0.1, is_webui, progress)
     vocals_path, instrumentals_path = run_mdx(mdx_model_params, song_output_dir, os.path.join(mdxnet_models_dir, 'Kim_Vocal_2.onnx'), orig_song_path, denoise=True, keep_orig=keep_orig)
 
-    display_progress('[~] Разделение основного вокала и бэк-вокала...', 0.2, is_webui, progress)
+    display_progress('[~] Splitting main vocals and backup vocals...', 0.2, is_webui, progress)
     backup_vocals_path, main_vocals_path = run_mdx(mdx_model_params, song_output_dir, os.path.join(mdxnet_models_dir, 'UVR_MDXNET_KARA_2.onnx'), vocals_path, suffix='Backup', invert_suffix='Main', denoise=True)
 
-    display_progress('[~] Применение DeReverb к вокалу...', 0.3, is_webui, progress)
+    display_progress('[~] Applying DeReverb to vocals...', 0.3, is_webui, progress)
     _, main_vocals_dereverb_path = run_mdx(mdx_model_params, song_output_dir, os.path.join(mdxnet_models_dir, 'Reverb_HQ_By_FoxJoy.onnx'), main_vocals_path, invert_suffix='DeReverb', exclude_main=True, denoise=True)
 
     return orig_song_path, vocals_path, instrumentals_path, main_vocals_path, backup_vocals_path, main_vocals_dereverb_path
@@ -198,38 +191,6 @@ def voice_change(voice_model, vocals_path, output_path, pitch_change, f0_method,
     gc.collect()
 
 
-def add_audio_effects(audio_path, reverb_rm_size, reverb_wet, reverb_dry, reverb_damping, reverb_width, low_shelf_gain, high_shelf_gain, limiter_threshold, compressor_ratio, 
-                      compressor_threshold, delay_time, delay_feedback, noise_gate_threshold, noise_gate_ratio, noise_gate_attack, noise_gate_release, drive_db, chorus_rate_hz, 
-                      chorus_depth, chorus_centre_delay_ms, chorus_feedback, chorus_mix, clipping_threshold):
-
-    output_path = f'{os.path.splitext(audio_path)[0]}_mixed.wav'
-
-    board = Pedalboard(
-        [
-            HighpassFilter(),
-            Compressor(ratio=compressor_ratio, threshold_db=compressor_threshold),
-            NoiseGate(threshold_db=noise_gate_threshold, ratio=noise_gate_ratio, attack_ms=noise_gate_attack, release_ms=noise_gate_release),
-            Reverb(room_size=reverb_rm_size, dry_level=reverb_dry, wet_level=reverb_wet, damping=reverb_damping, width=reverb_width),
-            LowShelfFilter(gain_db=low_shelf_gain),
-            HighShelfFilter(gain_db=high_shelf_gain),
-            Limiter(threshold_db=limiter_threshold),
-            Delay(delay_seconds=delay_time, feedback=delay_feedback),
-            Distortion(drive_db=drive_db),
-            Chorus(rate_hz=chorus_rate_hz, depth=chorus_depth, centre_delay_ms=chorus_centre_delay_ms, feedback=chorus_feedback, mix=chorus_mix),
-            Clipping(threshold_db=clipping_threshold)
-         ]
-    )
-
-    with AudioFile(audio_path) as f:
-        with AudioFile(output_path, 'w', f.samplerate, 2) as o:
-            while f.tell() < f.frames:
-                chunk = f.read(int(f.samplerate))
-                chunk = np.tile(chunk, (2, 1)).T
-                effected = board(chunk, f.samplerate, reset=False)
-                o.write(effected)
-
-    return output_path
-
 def combine_audio(audio_paths, output_path, main_gain, backup_gain, inst_gain, output_format):
     main_vocal_audio = AudioSegment.from_wav(audio_paths[0]) - 4 + main_gain
     backup_vocal_audio = AudioSegment.from_wav(audio_paths[1]) - 6 + backup_gain
@@ -238,16 +199,13 @@ def combine_audio(audio_paths, output_path, main_gain, backup_gain, inst_gain, o
 
 
 def song_cover_pipeline(song_input, voice_model, pitch_change, keep_files, is_webui=0, main_gain=0, backup_gain=0, inst_gain=0, index_rate=0.5, filter_radius=3, rms_mix_rate=0.25, f0_method='rmvpe', 
-                        crepe_hop_length=128, protect=0.33, reverb_rm_size=0.15, reverb_wet=0.2, reverb_dry=0.8, reverb_damping=0.7, reverb_width=1.0, low_shelf_gain=0, high_shelf_gain=0, 
-                        limiter_threshold=-6, compressor_ratio=4, compressor_threshold=-15, delay_time=0.5, delay_feedback=0.5, noise_gate_threshold=-30, noise_gate_ratio=2, noise_gate_attack=10, 
-                        noise_gate_release=100, output_format='mp3', progress=gr.Progress(), drive_db=0, chorus_rate_hz=1.1, chorus_depth=0.25, chorus_centre_delay_ms=25, chorus_feedback=0.25, 
-                        chorus_mix=0.5, clipping_threshold=-6.0, f0autotune=False, f0_min=50, f0_max=1100):
+                        crepe_hop_length=128, protect=0.33, output_format='mp3', progress=gr.Progress(), f0autotune=False, f0_min=50, f0_max=1100):
 
     try:
         if not song_input or not voice_model:
-            raise_exception('Убедитесь, что поле ввода песни и поле модели голоса заполнены.', is_webui)
+            raise_exception('Make sure the song input field and voice model field are filled in.', is_webui)
 
-        display_progress('[~] Запуск конвейера генерации AI-кавера...', 0, is_webui, progress)
+        display_progress('[~] Starting AI cover generation pipeline...', 0, is_webui, progress)
 
         with open(os.path.join(mdxnet_models_dir, 'model_data.json')) as infile:
             mdx_model_params = json.load(infile)
@@ -256,7 +214,7 @@ def song_cover_pipeline(song_input, voice_model, pitch_change, keep_files, is_we
             input_type = 'yt'
             song_id = get_youtube_video_id(song_input)
             if song_id is None:
-                error_msg = 'Неверный URL-адрес YouTube.'
+                error_msg = 'Invalid YouTube URL.'
                 raise_exception(error_msg, is_webui)
         else:
             input_type = 'local'
@@ -264,7 +222,7 @@ def song_cover_pipeline(song_input, voice_model, pitch_change, keep_files, is_we
             if os.path.exists(song_input):
                 song_id = get_hash(song_input)
             else:
-                error_msg = f'{song_input} не существует.'
+                error_msg = f'{song_input} does not exist.'
                 song_id = None
                 raise_exception(error_msg, is_webui)
 
@@ -291,22 +249,17 @@ def song_cover_pipeline(song_input, voice_model, pitch_change, keep_files, is_we
             os.remove(ai_cover_path)
 
         if not os.path.exists(ai_vocals_path):
-            display_progress('[~] Преобразование вокала...', 0.5, is_webui, progress)
+            display_progress('[~] Converting vocals...', 0.5, is_webui, progress)
             voice_change(voice_model, main_vocals_dereverb_path, ai_vocals_path, pitch_change, f0_method, index_rate, 
                          filter_radius, rms_mix_rate, protect, crepe_hop_length, f0autotune, f0_min, f0_max, is_webui)
 
-        display_progress('[~] Применение аудиоэффектов к вокалу...', 0.8, is_webui, progress)
-        ai_vocals_mixed_path = add_audio_effects(ai_vocals_path, reverb_rm_size, reverb_wet, reverb_dry, reverb_damping, reverb_width, low_shelf_gain, high_shelf_gain, limiter_threshold, 
-                                                 compressor_ratio, compressor_threshold, delay_time, delay_feedback, noise_gate_threshold, noise_gate_ratio, noise_gate_attack, 
-                                                 noise_gate_release, drive_db, chorus_rate_hz, chorus_depth, chorus_centre_delay_ms, chorus_feedback, chorus_mix, clipping_threshold)
+        display_progress('[~] Combining AI vocals and instrumental...', 0.9, is_webui, progress)
+        combine_audio([ai_vocals_path, backup_vocals_path, instrumentals_path], ai_cover_path, main_gain, backup_gain, inst_gain, output_format)
 
-        display_progress('[~] Объединение AI-вокала и инструментальной части...', 0.9, is_webui, progress)
-        combine_audio([ai_vocals_mixed_path, backup_vocals_path, instrumentals_path], ai_cover_path, main_gain, backup_gain, inst_gain, output_format)
-
-        intermediate_files = [vocals_path, main_vocals_path, ai_vocals_mixed_path]
+        intermediate_files = [vocals_path, main_vocals_path]
 
         if not keep_files:
-            display_progress('[~] Удаление промежуточных аудиофайлов...', 0.95, is_webui, progress)
+            display_progress('[~] Removing intermediate audio files...', 0.95, is_webui, progress)
             for file in intermediate_files:
                 if file and os.path.exists(file):
                     os.remove(file)
@@ -333,10 +286,6 @@ if __name__ == '__main__':
     parser.add_argument('-bv', '--backup-vol', type=int, default=0, help='Volume change for backup vocals in decibels')
     parser.add_argument('-iv', '--inst-vol', type=int, default=0, help='Volume change for instrumentals in decibels')
     parser.add_argument('-pall', '--pitch-change-all', type=int, default=0, help='Change the pitch/key of vocals and instrumentals. Changing this slightly reduces sound quality')
-    parser.add_argument('-rsize', '--reverb-size', type=float, default=0.15, help='Reverb room size between 0 and 1')
-    parser.add_argument('-rwet', '--reverb-wetness', type=float, default=0.2, help='Reverb wet level between 0 and 1')
-    parser.add_argument('-rdry', '--reverb-dryness', type=float, default=0.8, help='Reverb dry level between 0 and 1')
-    parser.add_argument('-rdamp', '--reverb-damping', type=float, default=0.7, help='Reverb damping between 0 and 1')
     parser.add_argument('-oformat', '--output-format', type=str, default='mp3', help='Output format of audio file. mp3 for smaller file size, wav for best quality')
     parser.add_argument('-minpitch', '--minimum-pitch', type=int, default=50, help='Specify minimal pitch for inference [HZ]')
     parser.add_argument('-maxpitch', '--maximum-pitch', type=int, default=1100, help='Specify max pitch for inference [HZ]')
@@ -345,7 +294,7 @@ if __name__ == '__main__':
 
     rvc_dirname = args.rvc_dirname
     if not os.path.exists(os.path.join(rvc_models_dir, rvc_dirname)):
-        raise Exception(f'Папка {os.path.join(rvc_models_dir, rvc_dirname)} не найдена.')
+        raise Exception(f'The folder {os.path.join(rvc_models_dir, rvc_dirname)} was not found.')
 
     cover_path = song_cover_pipeline(args.song_input, rvc_dirname, args.pitch_change, args.keep_files,
                                      main_gain=args.main_vol, backup_gain=args.backup_vol, inst_gain=args.inst_vol,
@@ -353,8 +302,6 @@ if __name__ == '__main__':
                                      rms_mix_rate=args.rms_mix_rate, f0_method=args.pitch_detection_algo,
                                      crepe_hop_length=args.crepe_hop_length, protect=args.protect,
                                      pitch_change_all=args.pitch_change_all,
-                                     reverb_rm_size=args.reverb_size, reverb_wet=args.reverb_wetness,
-                                     reverb_dry=args.reverb_dryness, reverb_damping=args.reverb_damping,
                                      output_format=args.output_format, f0autotune=args.autotune,
                                      f0_min=args.minimum_pitch, f0_max=args.maximum_pitch)
-    print(f'[+] Кавер создан по пути {cover_path}')
+    print(f'[+] Cover created at {cover_path}')

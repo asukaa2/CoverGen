@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CoverGen — AI Song Cover Generator</title>
+    <link rel="icon" href="/favicon.ico" type="image/svg+xml" />
+    <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+    <div class="bg-glow" aria-hidden="true"></div>
+
+    <header class="topbar">
+        <div class="brand">
+            <span class="brand-mark">▶</span>
+            <div class="brand-text">
+                <h1>Cover<span>Gen</span></h1>
+                <p>AI Song Cover Generator</p>
+            </div>
+        </div>
+        <div class="conn-status" id="connStatus">
+            <span class="dot" id="connDot"></span>
+            <span id="connText">Connecting…</span>
+        </div>
+    </header>
+
+    <main class="layout">
+        <!-- ============ LEFT COLUMN: INPUT & SETTINGS ============ -->
+        <section class="panel source-panel">
+            <h2 class="panel-title">1 · Song Source</h2>
+
+            <div class="tabs" role="tablist">
+                <button class="tab active" id="tabUrl" role="tab" type="button">YouTube Link</button>
+                <button class="tab" id="tabUpload" role="tab" type="button">Upload Audio</button>
+            </div>
+
+            <div class="tab-body" id="bodyUrl">
+                <label class="field-label" for="songInput">YouTube URL or local file path</label>
+                <input type="text" id="songInput" class="text-input"
+                       placeholder="https://www.youtube.com/watch?v=…" autocomplete="off" />
+            </div>
+
+            <div class="tab-body hidden" id="bodyUpload">
+                <label class="dropzone" id="dropzone" for="audioUpload">
+                    <input type="file" id="audioUpload" accept="audio/*" hidden />
+                    <span class="dz-icon">♪</span>
+                    <span class="dz-main" id="dzMain">Click or drop an audio file here</span>
+                    <span class="dz-sub" id="dzSub">MP3, WAV, FLAC, OGG…</span>
+                </label>
+            </div>
+
+            <h2 class="panel-title">2 · Voice Model</h2>
+            <div class="model-row">
+                <select id="voiceModel" class="select-input"></select>
+                <button class="btn btn-ghost btn-icon" id="refreshModels" title="Refresh models list" type="button">⟳</button>
+                <button class="btn btn-ghost" id="openModelMgr" type="button">Manage…</button>
+            </div>
+            <p class="hint" id="modelHint">No voice models found — open “Manage…” to add one.</p>
+
+            <h2 class="panel-title">3 · Quick Settings</h2>
+            <div class="grid-2">
+                <div class="field">
+                    <div class="field-head">
+                        <label class="field-label" for="pitch">Pitch change</label>
+                        <span class="badge" id="pitchVal">0</span>
+                    </div>
+                    <input type="range" id="pitch" min="-24" max="24" step="1" value="0" />
+                    <p class="hint">−24 male voice · +24 female voice</p>
+                </div>
+                <div class="field">
+                    <label class="field-label" for="outputFormat">Output format</label>
+                    <select id="outputFormat" class="select-input">
+                        <option value="mp3" selected>MP3</option>
+                        <option value="flac">FLAC</option>
+                        <option value="wav">WAV</option>
+                    </select>
+                    <label class="check-row"><input type="checkbox" id="keepFiles" /> Keep intermediate files</label>
+                </div>
+            </div>
+
+            <details class="advanced" id="advancedBox">
+                <summary>Voice conversion settings (advanced)</summary>
+                <div class="grid-2">
+                    <div class="field">
+                        <label class="field-label" for="f0Method">Pitch detection method</label>
+                        <select id="f0Method" class="select-input">
+                            <option value="rmvpe+" selected>rmvpe+ (recommended)</option>
+                            <option value="rmvpe">rmvpe</option>
+                            <option value="fcpe">fcpe</option>
+                            <option value="mangio-crepe">mangio-crepe</option>
+                            <option value="hybrid[rmvpe+fcpe]">hybrid[rmvpe+fcpe]</option>
+                            <option value="hybrid[rmvpe+mangio-crepe]">hybrid[rmvpe+mangio-crepe]</option>
+                            <option value="hybrid[mangio-crepe+rmvpe+fcpe]">hybrid[all]</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <div class="field-head">
+                            <label class="field-label" for="crepeHop">Hop length</label>
+                            <span class="badge" id="hopVal">128</span>
+                        </div>
+                        <input type="range" id="crepeHop" min="8" max="512" step="8" value="128" />
+                        <p class="hint">Smaller = better pitch accuracy, slower</p>
+                    </div>
+                    <div class="field">
+                        <div class="field-head">
+                            <label class="field-label" for="indexRate">Index rate</label>
+                            <span class="badge" id="indexVal">0.50</span>
+                        </div>
+                        <input type="range" id="indexRate" min="0" max="1" step="0.05" value="0.5" />
+                    </div>
+                    <div class="field">
+                        <div class="field-head">
+                            <label class="field-label" for="filterRadius">Filter radius</label>
+                            <span class="badge" id="filterVal">3</span>
+                        </div>
+                        <input type="range" id="filterRadius" min="0" max="7" step="1" value="3" />
+                    </div>
+                    <div class="field">
+                        <div class="field-head">
+                            <label class="field-label" for="rmsRate">RMS mix rate</label>
+                            <span class="badge" id="rmsVal">0.25</span>
+                        </div>
+                        <input type="range" id="rmsMixRate" min="0" max="1" step="0.05" value="0.25" />
+                    </div>
+                    <div class="field">
+                        <div class="field-head">
+                            <label class="field-label" for="protect">Protect rate</label>
+                            <span class="badge" id="protectVal">0.33</span>
+                        </div>
+                        <input type="range" id="protect" min="0" max="0.5" step="0.01" value="0.33" />
+                    </div>
+                    <div class="field">
+                        <label class="field-label" for="f0Min">Min pitch (Hz)</label>
+                        <input type="number" id="f0Min" class="text-input" min="1" max="16000" value="50" />
+                    </div>
+                    <div class="field">
+                        <label class="field-label" for="f0Max">Max pitch (Hz)</label>
+                        <input type="number" id="f0Max" class="text-input" min="1" max="16000" value="1100" />
+                    </div>
+                    <div class="field">
+                        <div class="field-head"><label class="field-label" for="mainGain">Main vocals gain (dB)</label><span class="badge" id="mgVal">0</span></div>
+                        <input type="range" id="mainGain" min="-20" max="20" step="1" value="0" />
+                    </div>
+                    <div class="field">
+                        <div class="field-head"><label class="field-label" for="backupGain">Backup vocals gain (dB)</label><span class="badge" id="bgVal">0</span></div>
+                        <input type="range" id="backupGain" min="-20" max="20" step="1" value="0" />
+                    </div>
+                    <div class="field">
+                        <div class="field-head"><label class="field-label" for="instGain">Instrumentals gain (dB)</label><span class="badge" id="igVal">0</span></div>
+                        <input type="range" id="instGain" min="-20" max="20" step="1" value="0" />
+                    </div>
+                    <div class="field">
+                        <label class="field-label">Pitch correction</label>
+                        <label class="check-row"><input type="checkbox" id="f0Autotune" /> Enable autotune</label>
+                    </div>
+                </div>
+            </details>
+
+            <button class="btn btn-primary btn-generate" id="generateBtn" type="button" disabled>
+                <span class="btn-label">Generate AI Cover</span>
+            </button>
+            <div class="status-bar hidden" id="statusBar">
+                <span class="spinner"></span>
+                <span id="statusText">Starting…</span>
+            </div>
+            <div class="alert error hidden" id="errorBox"></div>
+        </section>
+
+        <!-- ============ RIGHT COLUMN: RESULTS ============ -->
+        <section class="panel result-panel">
+            <h2 class="panel-title">Result</h2>
+
+            <div class="empty-state" id="emptyState">
+                <div class="empty-art">🎧</div>
+                <p>Your AI cover will appear here.</p>
+                <p class="hint">Pick a song source + voice model, then hit Generate.</p>
+            </div>
+
+            <div class="result-body hidden" id="resultBody">
+                <div class="cover-card">
+                    <div class="cover-label">AI Cover</div>
+                    <audio id="coverPlayer" controls preload="metadata"></audio>
+                    <a class="btn btn-ghost btn-dl" id="coverDownload" download>⤓ Download</a>
+                </div>
+
+                <details class="stems">
+                    <summary>Intermediate audio files</summary>
+                    <div class="stem-row"><span>Converted Vocals</span><audio id="stemConverted" controls preload="none"></audio></div>
+                    <div class="stem-row"><span>Dereverbed Vocals</span><audio id="stemDereverb" controls preload="none"></audio></div>
+                    <div class="stem-row"><span>Backup Vocals</span><audio id="stemBackup" controls preload="none"></audio></div>
+                    <div class="stem-row"><span>Instrumentals</span><audio id="stemInstrumental" controls preload="none"></audio></div>
+                </details>
+            </div>
+        </section>
+    </main>
+
+    <!-- ============ MODEL MANAGER MODAL ============ -->
+    <div class="modal-backdrop hidden" id="modalBackdrop">
+        <div class="modal" role="dialog" aria-modal="true">
+            <div class="modal-head">
+                <h3>Voice Model Manager</h3>
+                <button class="btn btn-ghost btn-icon" id="closeModal" type="button">✕</button>
+            </div>
+
+            <div class="modal-section">
+                <h4>Installed models</h4>
+                <ul class="model-list" id="modelList"></ul>
+            </div>
+
+            <div class="modal-section">
+                <h4>Download from link</h4>
+                <p class="hint">Zip must contain a .pth model file (+ optional .index). Supports HuggingFace, Pixeldrain, Google Drive.</p>
+                <input type="text" id="modelUrl" class="text-input" placeholder="https://huggingface.co/…/model.zip" />
+                <input type="text" id="modelName" class="text-input" placeholder="Unique model name" />
+                <button class="btn btn-primary" id="dlModelBtn" type="button">Download Model</button>
+            </div>
+
+            <div class="modal-section">
+                <h4>Upload local zip</h4>
+                <input type="file" id="zipUpload" accept=".zip" class="file-input" />
+                <input type="text" id="zipName" class="text-input" placeholder="Unique model name" />
+                <button class="btn btn-primary" id="upModelBtn" type="button">Upload Model</button>
+            </div>
+
+            <div class="alert hidden" id="modalMsg"></div>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <p>CoverGen · MDX-Net separation + RVC voice conversion · backend: Python + gradio.Server · frontend: vanilla HTML/CSS/JS</p>
+    </footer>
+
+    <script type="module" src="/static/app.js"></script>
+</body>
+</html>

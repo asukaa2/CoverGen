@@ -12,13 +12,13 @@ import gradio as gr
 import librosa
 import numpy as np
 import soundfile as sf
-import sox
+import torch
 import yt_dlp
 
 from pydub import AudioSegment
 
 from infer.mdx import run_mdx
-from infer.infer import Config, load_hubert, get_vc, rvc_infer
+from infer.infer import Config, get_vc, rvc_infer
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -123,30 +123,13 @@ def convert_to_stereo(audio_path):
         return audio_path
 
 
-def pitch_shift(audio_path, pitch_change):
-    output_path = f'{os.path.splitext(audio_path)[0]}_overall_pitch.wav'
-    if not os.path.exists(output_path):
-        y, sr = sf.read(audio_path)
-        tfm = sox.Transformer()
-        tfm.pitch(pitch_change)
-        y_shifted = tfm.build_array(input_array=y, sample_rate_in=sr)
-        sf.write(output_path, y_shifted, sr)
-
-    return output_path
-
-
-def get_hash(filepath):
-    with open(filepath, 'rb') as f:
-        file_hash = hashlib.blake2b()
-        while chunk := f.read(8192):
-            file_hash.update(chunk)
-
-    return file_hash.hexdigest()[:11]
-
-
 def display_progress(message, percent, is_webui, progress=None):
-    if is_webui:
-        progress(percent, desc=message)
+    if is_webui and progress is not None:
+        try:
+            progress(percent, desc=message)
+        except Exception:
+            # Progress tracking is unavailable outside a Gradio event context.
+            print(message)
     else:
         print(message)
 
@@ -178,17 +161,26 @@ def preprocess_song(song_input, mdx_model_params, song_id, is_webui, input_type,
     return orig_song_path, vocals_path, instrumentals_path, main_vocals_path, backup_vocals_path, main_vocals_dereverb_path
 
 
+def get_hash(filepath):
+    with open(filepath, 'rb') as f:
+        file_hash = hashlib.blake2b()
+        while chunk := f.read(8192):
+            file_hash.update(chunk)
+
+    return file_hash.hexdigest()[:11]
+
+
 def voice_change(voice_model, vocals_path, output_path, pitch_change, f0_method, index_rate, filter_radius, rms_mix_rate, protect, crepe_hop_length, f0autotune, f0_min, f0_max, is_webui):
-    hubert_model = "hubert_base"
     rvc_model_path, rvc_index_path = get_rvc_model(voice_model, is_webui)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
     config = Config(device, True)
-    
+
     cpt, version, net_g, tgt_sr, vc = get_vc(device, config.is_half, config, rvc_model_path)
 
-    rvc_infer(rvc_index_path, index_rate, vocals_path, output_path, pitch_change, f0_method, cpt, version, net_g, 
-              filter_radius, tgt_sr, rms_mix_rate, protect, crepe_hop_length, vc, hubert_model, f0autotune, f0_min, f0_max)
-    
+    rvc_infer(rvc_index_path, index_rate, vocals_path, output_path, pitch_change, f0_method, cpt, version, net_g,
+              filter_radius, tgt_sr, rms_mix_rate, protect, crepe_hop_length, vc, config, 'hubert_base',
+              rvc_models_dir, f0autotune, f0_min, f0_max)
+
     gc.collect()
 
 
@@ -199,8 +191,8 @@ def combine_audio(audio_paths, output_path, main_gain, backup_gain, inst_gain, o
     main_vocal_audio.overlay(backup_vocal_audio).overlay(instrumental_audio).export(output_path, format=output_format)
 
 
-def song_cover_pipeline(song_input, voice_model, pitch_change, keep_files, is_webui=0, main_gain=0, backup_gain=0, inst_gain=0, index_rate=0.5, filter_radius=3, rms_mix_rate=0.25, f0_method='rmvpe', 
-                        crepe_hop_length=128, protect=0.33, output_format='mp3', progress=gr.Progress(), f0autotune=False, f0_min=50, f0_max=1100):
+def song_cover_pipeline(song_input, voice_model, pitch_change, keep_files, is_webui=0, main_gain=0, backup_gain=0, inst_gain=0, index_rate=0.5, filter_radius=3, rms_mix_rate=0.25, f0_method='rmvpe',
+                        crepe_hop_length=128, protect=0.33, output_format='mp3', progress=None, f0autotune=False, f0_min=50, f0_max=1100):
 
     try:
         if not song_input or not voice_model:
@@ -286,7 +278,7 @@ if __name__ == '__main__':
     parser.add_argument('-mv', '--main-vol', type=int, default=0, help='Volume change for AI main vocals in decibels. Use -3 to decrease by 3 decibels and 3 to increase by 3 decibels')
     parser.add_argument('-bv', '--backup-vol', type=int, default=0, help='Volume change for backup vocals in decibels')
     parser.add_argument('-iv', '--inst-vol', type=int, default=0, help='Volume change for instrumentals in decibels')
-    parser.add_argument('-pall', '--pitch-change-all', type=int, default=0, help='Change the pitch/key of vocals and instrumentals. Changing this slightly reduces sound quality')
+    parser.add_argument('-pall', '--pitch-change-all', type=int, default=0, help='Not used by the pipeline anymore; kept for CLI compatibility')
     parser.add_argument('-oformat', '--output-format', type=str, default='mp3', help='Output format of audio file. mp3 for smaller file size, wav for best quality')
     parser.add_argument('-minpitch', '--minimum-pitch', type=int, default=50, help='Specify minimal pitch for inference [HZ]')
     parser.add_argument('-maxpitch', '--maximum-pitch', type=int, default=1100, help='Specify max pitch for inference [HZ]')
@@ -302,7 +294,6 @@ if __name__ == '__main__':
                                      index_rate=args.index_rate, filter_radius=args.filter_radius,
                                      rms_mix_rate=args.rms_mix_rate, f0_method=args.pitch_detection_algo,
                                      crepe_hop_length=args.crepe_hop_length, protect=args.protect,
-                                     pitch_change_all=args.pitch_change_all,
                                      output_format=args.output_format, f0autotune=args.autotune,
                                      f0_min=args.minimum_pitch, f0_max=args.maximum_pitch)
     print(f'[+] Cover created at {cover_path}')

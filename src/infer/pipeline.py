@@ -1,11 +1,10 @@
 from functools import lru_cache
-import numpy as np, parselmouth, torch, pdb, sys, os
+import numpy as np, parselmouth, torch, sys, os
 from time import time as ttime
 import torch.nn.functional as F
-import torchcrepe
 from scipy import signal
 from torch import Tensor
-import pyworld, os, faiss, librosa, torchcrepe
+import faiss, librosa
 import random
 import gc
 import re
@@ -125,6 +124,15 @@ class VC(object):
             return torch.device("mps")
         return torch.device("cpu")
 
+    def normalize_f0_method(self, f0_method):
+        """Map UI-level method names to the generator's supported methods."""
+        aliases = {
+            'rmvpe+': 'rmvpe',
+            'mangio-crepe': 'mangio-crepe-full',
+            'crepe': 'crepe-full',
+        }
+        return aliases.get(f0_method, f0_method)
+
     def get_f0(
         self,
         input_audio_path,
@@ -144,16 +152,39 @@ class VC(object):
         f0_mel_min = 1127 * np.log(1 + f0_min / 700)
         f0_mel_max = 1127 * np.log(1 + f0_max / 700)
 
-        # Use the new Generator's calculator for all f0 methods
-        f0_coarse, f0bak = self.generator.calculator(
-            f0_method=f0_method,
-            x=x,
-            f0_up_key=f0_up_key,
-            p_len=p_len,
-            filter_radius=filter_radius,
-            f0_autotune=(f0autotune == "True"),
-            f0_autotune_strength=1.0,
-        )
+        # Propagate user settings into the pitch generator.
+        self.generator.f0_min = f0_min
+        self.generator.f0_max = f0_max
+
+        if f0_method.startswith('hybrid[') and f0_method.endswith(']'):
+            # Hybrid methods: average the f0 curves of multiple trackers.
+            sub_methods = f0_method[len('hybrid['):-1].split('+')
+            f0_curves = []
+            for sub in sub_methods:
+                sub_normalized = self.normalize_f0_method(sub.strip())
+                self.sync_hop_length(sub_normalized, crepe_hop_length)
+                f0_curves.append(self.generator.compute_f0(
+                    sub_normalized, x, p_len,
+                    filter_radius if filter_radius % 2 != 0 else filter_radius + 1
+                ))
+            if isinstance(f0_curves[0], tuple): f0_curves = [c[0] for c in f0_curves]
+            stacked = np.vstack([np.asarray(c, dtype=np.float64) for c in f0_curves])
+            voiced = stacked > 0
+            voiced_count = voiced.sum(axis=0)
+            f0_bak_avg = np.where(voiced_count > 0, stacked.sum(axis=0) / np.maximum(voiced_count, 1), 0.0)
+            f0_coarse, f0bak = post_process(f0_bak_avg, f0_up_key, f0_mel_min, f0_mel_max)
+        else:
+            normalized = self.normalize_f0_method(f0_method)
+            self.sync_hop_length(normalized, crepe_hop_length)
+            f0_coarse, f0bak = self.generator.calculator(
+                f0_method=normalized,
+                x=x,
+                f0_up_key=f0_up_key,
+                p_len=p_len,
+                filter_radius=filter_radius,
+                f0_autotune=bool(f0autotune),
+                f0_autotune_strength=1.0,
+            )
 
         # Handle inp_f0 replacement if provided
         if inp_f0 is not None:
@@ -175,6 +206,19 @@ class VC(object):
             )
 
         return f0_coarse, f0bak
+
+    def sync_hop_length(self, f0_method, crepe_hop_length):
+        """Keep the generator's hop length in sync for crepe-based trackers.
+
+        Cached crepe models are invalidated when the hop length changes because
+        the hop length is baked into the model instance at construction time.
+        """
+        if 'crepe' not in f0_method:
+            return
+        if self.generator.hop_length != crepe_hop_length:
+            self.generator.hop_length = crepe_hop_length
+            if hasattr(self.generator, 'crepe'): del self.generator.crepe
+            if hasattr(self.generator, 'mangio_crepe'): del self.generator.mangio_crepe
 
     def vc(
         self,

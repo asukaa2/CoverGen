@@ -1,22 +1,20 @@
 import os
-import sys
 import math
 import torch
 import parselmouth
 
-import numba as nb
 import numpy as np
 
 from librosa import yin, pyin
 from scipy.signal import medfilt
 
-sys.path.append(os.getcwd())
-
 from predictor.RMVPE import RMVPE
 from predictor.FCPE import FCPE
 from predictor.PYWORLD import PYWORLD
-from predictor.SWIPE import swipe, stonemask
 from predictor.CREPE import CREPE, mean, median
+
+# Absolute directory that stores predictor/embedder model files (independent of CWD).
+MODELS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'models')
 
 
 
@@ -34,9 +32,8 @@ class Autotune:
         return autotuned_f0
 
 
-@nb.jit(nopython=True)
 def post_process(f0, f0_up_key, f0_mel_min, f0_mel_max):
-    f0 = np.multiply(f0, pow(2, f0_up_key / 12))
+    f0 = np.multiply(f0, 2 ** (f0_up_key / 12))
 
     f0_mel = 1127 * np.log(1 + f0 / 700)
     f0_mel[f0_mel > 0] = (f0_mel[f0_mel > 0] - f0_mel_min) * 254 / (f0_mel_max - f0_mel_min) + 1
@@ -105,7 +102,6 @@ class Generator:
             "harvest": lambda: self.get_f0_pyworld(x, p_len, filter_radius, "harvest"), 
             "yin": lambda: self.get_f0_yin(x, p_len, mode="yin"), 
             "pyin": lambda: self.get_f0_yin(x, p_len, mode="pyin"), 
-            "swipe": lambda: self.get_f0_swipe(x, p_len)
         }[f0_method]()
     
     def get_f0_pm(self, x, p_len):
@@ -130,7 +126,7 @@ class Generator:
         if not hasattr(self, "mangio_crepe"):
             self.mangio_crepe = CREPE(
                 os.path.join(
-                    "models", 
+                    MODELS_DIR, 
                     f"crepe_{model}.pth"
                 ), 
                 model_size=model, 
@@ -156,7 +152,7 @@ class Generator:
         if not hasattr(self, "crepe"):
             self.crepe = CREPE(
                 os.path.join(
-                    "models", 
+                    MODELS_DIR, 
                     f"crepe_{model}.pth"
                 ), 
                 model_size=model, 
@@ -179,7 +175,7 @@ class Generator:
         if not hasattr(self, "fcpe"): 
             self.fcpe = FCPE(
                 os.path.join(
-                    "models", 
+                    MODELS_DIR, 
                     ("fcpe_legacy" if legacy else "fcpe") + ".pt"
                 ), 
                 hop_length=self.hop_length, 
@@ -199,7 +195,7 @@ class Generator:
         if not hasattr(self, "rmvpe"): 
             self.rmvpe = RMVPE(
                 os.path.join(
-                    "models", 
+                    MODELS_DIR, 
                     "rmvpe.pt"
                 ), 
                 is_half=self.is_half, 
@@ -236,25 +232,6 @@ class Generator:
                 f0[index] = round(pitch, 1)
 
         return self._resize_f0(f0, p_len)
-    
-    def get_f0_swipe(self, x, p_len):
-        f0, t = swipe(
-            x.astype(np.float32), 
-            self.sample_rate, 
-            f0_floor=self.f0_min, 
-            f0_ceil=self.f0_max, 
-            frame_period=1000 * self.window / self.sample_rate
-        )
-
-        return self._resize_f0(
-            stonemask(
-                x, 
-                self.sample_rate, 
-                t, 
-                f0
-            ), 
-            p_len
-        )
     
     def get_f0_yin(self, x, p_len, mode="yin"):
         self.if_yin = mode == "yin"

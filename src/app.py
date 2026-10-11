@@ -1,6 +1,5 @@
 import json
 import os
-import sys
 import shutil
 import urllib.request
 import zipfile
@@ -20,7 +19,7 @@ output_dir = os.path.join(BASE_DIR, 'song_output')
 def get_current_models(models_dir):
     models_list = os.listdir(models_dir)
     items_to_remove = ['hubert_base.pt', 'MODELS.txt', 'rmvpe.pt', 'fcpe.pt']
-    return [item for item in models_list if item not in items_to_remove]
+    return [item for item in models_list if item not in items_to_remove and os.path.isdir(os.path.join(models_dir, item))]
 
 def update_models_list():
     models_l = get_current_models(rvc_models_dir)
@@ -83,29 +82,29 @@ def upload_local_model(zip_path, dir_name, progress=gr.Progress()):
         if os.path.exists(extraction_folder):
             raise gr.Error(f'Voice model directory {dir_name} already exists! Choose a different name for your voice model.')
 
-        zip_name = zip_path.name
+        # In Gradio 5+/6 the uploaded file is passed as a plain filepath string.
+        zip_name = zip_path if isinstance(zip_path, str) else zip_path.name
         progress(0.5, desc='[~] Extracting zip file...')
         extract_zip(extraction_folder, zip_name)
-        return f'[+] Model {dir_name} successfully downloaded!'
+        return f'[+] Model {dir_name} successfully uploaded!'
 
     except Exception as e:
         raise gr.Error(str(e))
-
-def pub_dl_autofill(pub_models, event: gr.SelectData):
-    return gr.update(value=pub_models.loc[event.index[0], 'URL']), gr.update(value=pub_models.loc[event.index[0], 'Model Name'])
 
 def swap_visibility():
     return gr.update(visible=True), gr.update(visible=False), gr.update(value=''), gr.update(value=None)
 
 def process_file_upload(file):
-    return file.name, gr.update(value=file.name)
+    # In Gradio 5+/6 the uploaded file is passed as a plain filepath string.
+    file_name = file if isinstance(file, str) else file.name
+    return file_name, gr.update(value=file_name)
 
 def show_hop_slider(pitch_detection_algo):
     if pitch_detection_algo in ['rmvpe+', 'mangio-crepe', 'hybrid[rmvpe+mangio-crepe]', 'hybrid[mangio-crepe+rmvpe]', 'hybrid[mangio-crepe+fcpe]', 'hybrid[mangio-crepe+rmvpe+fcpe]']:
         return gr.update(visible=True)
     else:
         return gr.update(visible=False)
-        
+
 def show_pitch_slider(pitch_detection_algo):
     if pitch_detection_algo in ['rmvpe+']:
         return gr.update(visible=True)
@@ -135,19 +134,19 @@ if __name__ == '__main__':
                     rvc_model = gr.Dropdown(voice_models, label='Voice Models', info='Directory "CoverGen/rvc_models". After adding new models to this directory, click the "Refresh Models List" button')
                     ref_btn = gr.Button('Refresh Models List 🔁', variant='primary')
 
-                        with gr.Column() as yt_link_col:
-                            song_input = gr.Text(label='Input Song', info='Link to a song on YouTube or the full path to a local file')
-                            song_input_file = gr.UploadButton('Upload File from Device', file_types=['audio'], variant='primary')
+                with gr.Column() as yt_link_col:
+                    song_input = gr.Text(label='Input Song', info='Link to a song on YouTube or the full path to a local file')
+                    song_input_file = gr.UploadButton('Upload File from Device', file_types=['audio'], variant='primary')
 
-                        with gr.Column(visible=False) as file_upload_col:
-                            local_file = gr.File(label='Audio File')
-                            show_yt_link_button = gr.Button('Insert YouTube Link / File Path')
-                            song_input_file.upload(process_file_upload, inputs=[song_input_file], outputs=[local_file, song_input])
-                            show_yt_link_button.click(swap_visibility, outputs=[yt_link_col, file_upload_col, song_input, local_file])
+                with gr.Column(visible=False) as file_upload_col:
+                    local_file = gr.File(label='Audio File')
+                    show_yt_link_button = gr.Button('Insert YouTube Link / File Path')
+                    song_input_file.upload(process_file_upload, inputs=[song_input_file], outputs=[local_file, song_input])
+                    show_yt_link_button.click(swap_visibility, outputs=[yt_link_col, file_upload_col, song_input, local_file])
 
-                        with gr.Column():
-                            pitch = gr.Slider(-24, 24, value=0, step=1, label='Voice Pitch Change', info='-24 - male voice || 24 - female voice')
-                            f0autotune = gr.Checkbox(label="Autotune", info='Automatically corrects pitch for a more harmonious vocal sound', value=False)
+                with gr.Column():
+                    pitch = gr.Slider(-24, 24, value=0, step=1, label='Voice Pitch Change', info='-24 - male voice || 24 - female voice')
+                    f0autotune = gr.Checkbox(label="Autotune", info='Automatically corrects pitch for a more harmonious vocal sound', value=False)
 
             with gr.Accordion('Voice Conversion Settings', open=False):
                 gr.Markdown('<center><h2>Main Settings</h2></center>')
@@ -156,7 +155,7 @@ if __name__ == '__main__':
                     filter_radius = gr.Slider(0, 7, value=3, step=1, label='Filter Radius', info='If >=3: applies median filtering to the harvested pitch results. Can reduce breathiness')
                     rms_mix_rate = gr.Slider(0, 1, value=0.25, label='RMS Mix Rate', info="Controls how accurately the original vocal's loudness (0) or a fixed loudness (1) is reproduced")
                     protect = gr.Slider(0, 0.5, value=0.33, label='Protect Rate', info='Protects voiceless consonants and breath sounds. Increasing the parameter to the maximum value of 0.5 provides full protection')
-                gr.Markdown('<center> Pitch Detection Settings</h2></center>')
+                gr.Markdown('<center><h2>Pitch Detection Settings</h2></center>')
                 with gr.Row():
                     with gr.Column():
                         use_hybrid_methods = gr.Checkbox(label="Use Hybrid Methods", value=False)
@@ -183,12 +182,12 @@ if __name__ == '__main__':
 
                 with gr.Column(scale=5):
                     with gr.Group():
-                        ai_cover = gr.Audio(label='AI Cover', show_share_button=False)
+                        ai_cover = gr.Audio(label='AI Cover')
                         with gr.Accordion("Intermediate Audio Files", open=False):
-                            ai_vocals = gr.Audio(label='Converted Vocals', show_share_button=False)
-                            main_vocals_dereverb = gr.Audio(label='Vocals', show_share_button=False)
-                            backup_vocals = gr.Audio(label='Backup Vocals', show_share_button=False)
-                            instrumentals = gr.Audio(label='Instrumentals', show_share_button=False)
+                            ai_vocals = gr.Audio(label='Converted Vocals')
+                            main_vocals_dereverb = gr.Audio(label='Vocals')
+                            backup_vocals = gr.Audio(label='Backup Vocals')
+                            instrumentals = gr.Audio(label='Instrumentals')
 
                 with gr.Column(scale=1, min_width=100):
                     output_format = gr.Dropdown(['mp3', 'flac', 'wav'], value='mp3', label='Output File Type', scale=0.5)
@@ -228,7 +227,7 @@ if __name__ == '__main__':
                 gr.Markdown('- Compress the files into a zip file')
                 gr.Markdown('- Upload the zip file and give the voice a unique name')
                 gr.Markdown('- Click the "Download Model" button')
-    
+
                 with gr.Row(equal_height=True):
                     with gr.Column(scale=2):
                         zip_file = gr.File(label='Zip File')
@@ -242,7 +241,7 @@ if __name__ == '__main__':
                     model_upload_button.click(upload_local_model, inputs=[zip_file, local_model_name], outputs=local_upload_output_message)
 
     app.launch(
-        share=True,
+        share=args.share_enabled,
         server_name=None if not args.listen else (args.listen_host or '0.0.0.0'),
         server_port=args.listen_port,
     )

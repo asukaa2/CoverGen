@@ -24,14 +24,4 @@ if __name__ == '__main__':
         print(f'Downloading {model}...')
         dl_model(MDX_DOWNLOAD_LINK, model, mdxnet_models_dir)
 
-    rvc_other_names = ['rmvpe.pt', 'fcpe.pt']
-    for model in rvc_other_names:
-        print(f'Downloading {model}...')
-        dl_model(RVC_other_DOWNLOAD_LINK, model, rvc_models_dir)
-
-    rvc_hubert_names = ['hubert_base.pt']
-    for model in rvc_hubert_names:
-        print(f'Downloading {model}...')
-        dl_model(RVC_hubert_DOWNLOAD_LINK, model, rvc_models_dir)
-
     print('All models downloaded!')

@@ -1,4 +1,3 @@
-from functools import lru_cache
 import numpy as np, parselmouth, torch, sys, os
 from time import time as ttime
 import torch.nn.functional as F
@@ -16,22 +15,6 @@ sys.path.append(now_dir)
 from predictor.generator import Generator, Autotune, post_process
 
 bh, ah = signal.butter(N=5, Wn=48, btype="high", fs=16000)
-
-input_audio_path2wav = {}
-
-
-@lru_cache
-def cache_harvest_f0(input_audio_path, fs, f0max, f0min, frame_period):
-    audio = input_audio_path2wav[input_audio_path]
-    f0, t = pyworld.harvest(
-        audio,
-        fs=fs,
-        f0_ceil=f0max,
-        f0_floor=f0min,
-        frame_period=frame_period,
-    )
-    f0 = pyworld.stonemask(audio, f0, t, fs)
-    return f0
 
 
 def change_rms(data1, sr1, data2, sr2, rate):
@@ -258,25 +241,52 @@ class VC(object):
         if protect < 0.5 and pitch != None and pitchf != None:
             feats0 = feats.clone()
         if (
-            isinstance(index, type(None)) == False
-            and isinstance(big_npy, type(None)) == False
+            index is not None
+            and big_npy is not None
             and index_rate != 0
+            and getattr(index, "ntotal", 0) > 0
+            and big_npy.shape[0] > 0
         ):
             npy = feats[0].cpu().numpy()
             if self.is_half:
                 npy = npy.astype("float32")
 
-            score, ix = index.search(npy, k=8)
-            weight = np.square(1 / score)
-            weight /= weight.sum(axis=1, keepdims=True)
-            npy = np.sum(big_npy[ix] * np.expand_dims(weight, axis=2), axis=1)
+            # Cap k at the number of indexed vectors. When k > ntotal (or the
+            # index is empty), faiss pads the missing neighbours with index -1,
+            # which would crash big_npy[ix] with an IndexError.
+            k = min(8, index.ntotal)
+            score, ix = index.search(npy, k=k)
 
-            if self.is_half:
-                npy = npy.astype("float16")
-            feats = (
-                torch.from_numpy(npy).unsqueeze(0).to(self.device) * index_rate
-                + (1 - index_rate) * feats
-            )
+            # Mask out invalid neighbour slots (-1) returned by faiss.
+            valid = ix >= 0
+            if not valid.any():
+                print(
+                    "[WARNING] Feature index returned no neighbours for this chunk; "
+                    "skipping index retrieval."
+                )
+            else:
+                safe_ix = np.where(valid, ix, 0)
+                safe_score = np.where(valid, score, 0.0)
+                # Epsilon avoids division by zero for exact-match distances;
+                # invalid slots are zeroed out so they never contribute.
+                weight = np.square(1.0 / (safe_score + 1e-10)) * valid
+                denom = weight.sum(axis=1, keepdims=True)
+                weighted_npy = np.sum(
+                    big_npy[safe_ix] * np.expand_dims(weight, axis=2), axis=1
+                )
+                # Rows without any valid neighbour keep the original features.
+                npy = np.where(
+                    denom[:, 0:1] > 0,
+                    weighted_npy / np.maximum(denom, 1e-10),
+                    npy,
+                ).astype(np.float32)
+
+                if self.is_half:
+                    npy = npy.astype("float16")
+                feats = (
+                    torch.from_numpy(npy).unsqueeze(0).to(self.device) * index_rate
+                    + (1 - index_rate) * feats
+                )
 
         feats = F.interpolate(feats.permute(0, 2, 1), scale_factor=2).permute(0, 2, 1)
         if protect < 0.5 and pitch != None and pitchf != None:
@@ -344,15 +354,34 @@ class VC(object):
         f0_min=50,
         f0_max=1100,
     ):
+        index = big_npy = None
         if file_index != "" and os.path.exists(file_index) == True and index_rate != 0:
             try:
                 index = faiss.read_index(file_index)
-                big_npy = index.reconstruct_n(0, index.ntotal)
+                if index.ntotal <= 0:
+                    print(
+                        f"[WARNING] Feature index '{os.path.basename(file_index)}' "
+                        "contains 0 vectors (empty or corrupt .index file). "
+                        "Continuing WITHOUT index retrieval - re-download or "
+                        "re-upload the model's .index file to restore full quality."
+                    )
+                    index = big_npy = None
+                else:
+                    big_npy = index.reconstruct_n(0, index.ntotal)
+                    if big_npy is None or big_npy.shape[0] == 0:
+                        print(
+                            f"[WARNING] Could not reconstruct vectors from "
+                            f"'{os.path.basename(file_index)}'. Continuing WITHOUT "
+                            "index retrieval."
+                        )
+                        index = big_npy = None
             except Exception as error:
-                print(error)
+                print(
+                    f"[WARNING] Failed to load feature index "
+                    f"'{os.path.basename(file_index)}': {error}. Continuing WITHOUT "
+                    "index retrieval."
+                )
                 index = big_npy = None
-        else:
-            index = big_npy = None
         audio = signal.filtfilt(bh, ah, audio)
         audio_pad = np.pad(audio, (self.window // 2, self.window // 2), mode="reflect")
         opt_ts = []

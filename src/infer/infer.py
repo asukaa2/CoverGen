@@ -13,6 +13,7 @@ from infer_pack.models import (
 )
 from infer.my_utils import load_audio
 from infer.pipeline import VC
+from predictor.utils import check_predictors, check_embedders, 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -81,18 +82,6 @@ class Config:
         return x_pad, x_query, x_center, x_max
 
 
-def load_hubert(device, is_half, model_path):
-    models, saved_cfg, task = checkpoint_utils.load_model_ensemble_and_task([model_path], suffix='', )
-    hubert = models[0]
-    hubert = hubert.to(device)
-
-    if is_half:
-        hubert = hubert.half()
-    else:
-        hubert = hubert.float()
-
-    hubert.eval()
-    return hubert
 
 
 def get_vc(device, is_half, config, model_path):
@@ -150,6 +139,17 @@ def rvc_infer(
     f0_min=50, 
     f0_max=1100
 ):
+    check_predictors(f0_method); check_embedders(embedder_model)
+
+    
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(device)
+    embedder_model_path = os.path.join("models", hubert_model + ".pt")
+    if not os.path.exists(embedder_model_path): raise FileNotFoundError(f"[ERROR] Not found embeddeder: {embedder_model}")
+        
+    models = fairseq.load_model(embedder_model_path).to(device).eval()
+    self.hubert_model = models.half() if self.config.is_half else models.float()
+
     audio = load_audio(input_path, 16000)
     times = [0, 0, 0]
     if_f0 = cpt.get('f0', 1)

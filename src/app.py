@@ -9,7 +9,7 @@ from argparse import ArgumentParser
 
 import gradio as gr
 
-from main import song_cover_pipeline
+from core import song_cover_pipeline
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 

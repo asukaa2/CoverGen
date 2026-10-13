@@ -1,17 +1,7 @@
-/* ============================================================
-   CoverGen frontend — PERSONA 5 EDITION  v2
-   Red / black / white, jagged edges, halftone dots, hard
-   shadows, skewed type. Light + Dark themes via data-theme.
-   ============================================================ */
-
-/* ------------------------------------------------------------
-   THEME TOKENS
-   ------------------------------------------------------------ */
 :root,
 html[data-theme="light"] {
     color-scheme: light;
 
-    /* P5 core palette */
     --p5-red: #e60012;
     --p5-red-hot: #ff2438;
     --p5-red-deep: #b3000e;
@@ -19,7 +9,6 @@ html[data-theme="light"] {
     --p5-yellow: #ffd900;
     --p5-white: #ffffff;
 
-    /* Semantic tokens (light = classic P5 menu: cream paper, black ink) */
     --bg: #f2ecdf;
     --bg-slash: rgba(230, 0, 18, 0.05);
     --surface: #fffdf5;
@@ -45,7 +34,6 @@ html[data-theme="light"] {
 html[data-theme="dark"] {
     color-scheme: dark;
 
-    /* Semantic tokens (dark = palace mode) */
     --bg: #0b0b0d;
     --bg-slash: rgba(230, 0, 18, 0.07);
     --surface: #151518;
@@ -68,9 +56,6 @@ html[data-theme="dark"] {
     --track: rgba(245, 240, 232, 0.22);
 }
 
-/* ------------------------------------------------------------
-   BASE
-   ------------------------------------------------------------ */
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 html { scroll-behavior: smooth; }
@@ -86,7 +71,6 @@ body {
     transition: background 0.25s ease, color 0.25s ease;
 }
 
-/* Halftone dot texture over the whole page */
 body::before {
     content: "";
     position: fixed;
@@ -98,7 +82,6 @@ body::before {
     z-index: 0;
 }
 
-/* Big red diagonal slash + glow behind the content */
 .bg-glow {
     position: fixed;
     inset: 0;
@@ -116,9 +99,6 @@ body::before {
 
 h1, h2, h3, h4 { line-height: 1.1; }
 
-/* ------------------------------------------------------------
-   TOP BAR
-   ------------------------------------------------------------ */
 .topbar {
     position: relative;
     z-index: 5;
@@ -198,7 +178,6 @@ h1, h2, h3, h4 { line-height: 1.1; }
 .dot.err { background: var(--danger); box-shadow: 0 0 8px var(--danger); animation: blink 0.8s infinite; }
 @keyframes blink { 50% { opacity: 0.3; } }
 
-/* Theme toggle — the sun/moon switch */
 .theme-toggle {
     width: 46px; height: 46px;
     display: grid;
@@ -216,9 +195,6 @@ h1, h2, h3, h4 { line-height: 1.1; }
 .theme-toggle:active { transform: skewX(-6deg) translate(2px, 2px); box-shadow: 1px 1px 0 var(--accent); }
 .theme-toggle span { display: block; transform: skewX(6deg); }
 
-/* ------------------------------------------------------------
-   LAYOUT
-   ------------------------------------------------------------ */
 .layout {
     position: relative;
     z-index: 2;
@@ -240,9 +216,6 @@ h1, h2, h3, h4 { line-height: 1.1; }
     filter: drop-shadow(7px 7px 0 var(--shadow));
 }
 
-/* ------------------------------------------------------------
-   PANEL TITLES — red striped ribbon
-   ------------------------------------------------------------ */
 .panel-title {
     display: inline-block;
     position: relative;
@@ -269,9 +242,6 @@ h1, h2, h3, h4 { line-height: 1.1; }
 .panel-title > * { transform: none; }
 .panel:not(.result-panel) .panel-title:not(:first-of-type) { margin-top: 22px; }
 
-/* ------------------------------------------------------------
-   TABS
-   ------------------------------------------------------------ */
 .tabs { display: flex; gap: 10px; margin-bottom: 14px; }
 
 .tab {
@@ -301,9 +271,6 @@ h1, h2, h3, h4 { line-height: 1.1; }
 
 .tab-body { margin-bottom: 6px; }
 
-/* ------------------------------------------------------------
-   FIELDS & INPUTS
-   ------------------------------------------------------------ */
 .field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 
 .field-head {
@@ -416,7 +383,6 @@ h1, h2, h3, h4 { line-height: 1.1; }
     font-weight: 900;
 }
 
-/* Range sliders — striped track, square red thumb */
 input[type="range"] {
     appearance: none;
     width: 100%;
@@ -456,9 +422,6 @@ input[type="range"]::-moz-range-thumb {
     transform: rotate(45deg);
 }
 
-/* ------------------------------------------------------------
-   DROPZONE
-   ------------------------------------------------------------ */
 .dropzone {
     display: flex;
     flex-direction: column;
@@ -493,9 +456,6 @@ input[type="range"]::-moz-range-thumb {
     color: var(--ink-dim);
 }
 
-/* ------------------------------------------------------------
-   BUTTONS
-   ------------------------------------------------------------ */
 .btn {
     display: inline-flex;
     align-items: center;
@@ -544,7 +504,6 @@ input[type="range"]::-moz-range-thumb {
 .model-row { display: flex; gap: 10px; align-items: stretch; }
 .model-row .select-input { flex: 1; }
 
-/* Generate — the big red "TAKE YOUR HEART" button */
 .btn-generate {
     width: 100%;
     margin-top: 22px;
@@ -576,9 +535,6 @@ input[type="range"]::-moz-range-thumb {
 
 .btn-dl { width: 100%; margin-top: 10px; }
 
-/* ------------------------------------------------------------
-   STATUS / ALERTS
-   ------------------------------------------------------------ */
 .status-bar {
     display: flex;
     align-items: center;
@@ -624,9 +580,6 @@ input[type="range"]::-moz-range-thumb {
 .alert.error { background: var(--danger-bg); color: var(--danger); border-color: var(--danger); }
 .alert.ok { background: var(--ok-bg); color: var(--ok); border-color: var(--ok); }
 
-/* ------------------------------------------------------------
-   RESULT PANEL
-   ------------------------------------------------------------ */
 .empty-state {
     display: flex;
     flex-direction: column;
@@ -716,9 +669,6 @@ html[data-theme="dark"] audio {
     color: var(--ink-dim);
 }
 
-/* ------------------------------------------------------------
-   MODEL MANAGER MODAL
-   ------------------------------------------------------------ */
 .modal-backdrop {
     position: fixed;
     inset: 0;
@@ -789,9 +739,6 @@ html[data-theme="dark"] audio {
 .model-list li:hover { transform: skewX(-4deg) translate(-2px, 0); border-color: var(--accent); box-shadow: 4px 4px 0 var(--accent); }
 .model-list li::before { content: "♪ "; color: var(--accent); font-weight: 900; }
 
-/* ------------------------------------------------------------
-   FOOTER
-   ------------------------------------------------------------ */
 .footer {
     position: relative;
     z-index: 2;
@@ -809,17 +756,11 @@ html[data-theme="dark"] audio {
     color: var(--ink-dim);
 }
 
-/* ------------------------------------------------------------
-   SCROLLBAR
-   ------------------------------------------------------------ */
 ::-webkit-scrollbar { width: 12px; }
 ::-webkit-scrollbar-track { background: var(--bg); border-left: 2px solid var(--ink); }
 ::-webkit-scrollbar-thumb { background: var(--accent); border: 2.5px solid var(--ink); }
 ::-webkit-scrollbar-thumb:hover { background: var(--p5-red-hot); }
 
-/* ------------------------------------------------------------
-   RESPONSIVE
-   ------------------------------------------------------------ */
 @media (max-width: 1080px) {
     .layout { grid-template-columns: 1fr; padding-top: 22px; }
     .result-panel { order: -1; }
@@ -834,9 +775,6 @@ html[data-theme="dark"] audio {
     .conn-status { display: none; }
 }
 
-/* ------------------------------------------------------------
-   REDUCED MOTION
-   ------------------------------------------------------------ */
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation: none !important; transition: none !important; }
 }

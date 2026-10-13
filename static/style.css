@@ -25,11 +25,9 @@
 html { scroll-behavior: smooth; }
 
 body {
-    font-family: "Times New Roman", Times, Georgia, serif;
+    font-family: "Syne", Times, Georgia, serif;
     font-size: 13px;
     background: #008080;
-    background-image:
-        repeating-linear-gradient(45deg, rgba(255,255,255,0.03) 0 2px, transparent 2px 4px);
     color: var(--ink);
     min-height: 100vh;
     line-height: 1.4;
@@ -55,9 +53,9 @@ h1, h2, h3, h4 {
 }
 
 .topbar {
-    background: linear-gradient(to bottom, #000080 0%, #1084d0 100%);
+    background: #000080;
     border: 2px outset #c0c0c0;
-    padding: 6px 10px;
+    padding: 4px 8px;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -104,7 +102,7 @@ h1, h2, h3, h4 {
     gap: 6px;
     font-family: Arial, Helvetica, sans-serif;
     font-size: 11px;
-    padding: 3px 8px;
+    padding: 2px 8px;
     background: #c0c0c0;
     color: #000000;
     border: 2px inset #c0c0c0;
@@ -154,8 +152,8 @@ h1, h2, h3, h4 {
     font-size: 13px;
     font-weight: bold;
     color: #ffffff;
-    background: linear-gradient(to bottom, #000080 0%, #1084d0 100%);
-    padding: 4px 8px;
+    background: #000080;
+    padding: 3px 8px;
     margin: 8px 0 10px;
     border: 2px outset #c0c0c0;
     text-transform: none;
@@ -172,7 +170,7 @@ h1, h2, h3, h4 {
 }
 
 .tab {
-    padding: 5px 12px;
+    padding: 4px 12px;
     cursor: pointer;
     font-family: Arial, Helvetica, sans-serif;
     font-size: 12px;
@@ -242,7 +240,7 @@ h1, h2, h3, h4 {
 
 .text-input, .select-input, .file-input {
     width: 100%;
-    padding: 3px 5px;
+    padding: 2px 4px;
     font-family: Arial, Helvetica, sans-serif;
     font-size: 12px;
     color: #000000;
@@ -338,7 +336,7 @@ input[type="range"]::-moz-range-thumb {
     align-items: center;
     justify-content: center;
     gap: 5px;
-    padding: 4px 12px;
+    padding: 3px 12px;
     cursor: pointer;
     font-family: Arial, Helvetica, sans-serif;
     font-size: 12px;
@@ -361,7 +359,7 @@ input[type="range"]::-moz-range-thumb {
     font-weight: bold;
 }
 
-.btn-icon { padding: 4px 8px; font-size: 13px; }
+.btn-icon { padding: 3px 8px; font-size: 13px; }
 
 .model-row { display: flex; gap: 6px; align-items: stretch; }
 .model-row .select-input { flex: 1; }
@@ -369,7 +367,7 @@ input[type="range"]::-moz-range-thumb {
 .btn-generate {
     width: 100%;
     margin-top: 12px;
-    padding: 8px 16px;
+    padding: 6px 16px;
     font-size: 14px;
     font-weight: bold;
     font-family: Arial, Helvetica, sans-serif;
@@ -383,7 +381,7 @@ input[type="range"]::-moz-range-thumb {
     align-items: center;
     gap: 8px;
     margin-top: 8px;
-    padding: 5px 10px;
+    padding: 4px 10px;
     background: #ffffcc;
     border: 2px inset #c0c0c0;
     font-family: Arial, Helvetica, sans-serif;
@@ -404,7 +402,7 @@ input[type="range"]::-moz-range-thumb {
 
 .alert {
     margin-top: 8px;
-    padding: 6px 10px;
+    padding: 5px 10px;
     font-family: Arial, Helvetica, sans-serif;
     font-size: 12px;
     border: 2px inset #c0c0c0;
@@ -439,7 +437,7 @@ input[type="range"]::-moz-range-thumb {
     position: absolute;
     top: -10px;
     left: 10px;
-    padding: 2px 8px;
+    padding: 1px 8px;
     font-family: Arial, Helvetica, sans-serif;
     font-size: 11px;
     font-weight: bold;
@@ -455,7 +453,7 @@ audio { width: 100%; display: block; }
     background: #d4d0c8;
 }
 .stems summary {
-    padding: 6px 10px;
+    padding: 5px 10px;
     cursor: pointer;
     font-family: Arial, Helvetica, sans-serif;
     font-size: 12px;
@@ -464,15 +462,15 @@ audio { width: 100%; display: block; }
     border-bottom: 1px solid #808080;
     list-style: none;
 }
-.stems summary::before { content: "▶ "; }
-.stems[open] summary::before { content: "▼ "; }
+.stems summary::before { content: "\25B6 "; }
+.stems[open] summary::before { content: "\25BC "; }
 
 .stem-row {
     display: grid;
     grid-template-columns: 130px 1fr;
     gap: 8px;
     align-items: center;
-    padding: 6px 10px;
+    padding: 5px 10px;
     border-bottom: 1px solid #a0a0a0;
 }
 .stem-row:last-child { border-bottom: none; }
@@ -490,7 +488,8 @@ audio { width: 100%; display: block; }
     display: grid;
     place-items: center;
     padding: 20px;
-    background: rgba(0, 0, 128, 0.5);
+    background: #000080;
+    opacity: 0.85;
 }
 
 .modal {
@@ -500,6 +499,7 @@ audio { width: 100%; display: block; }
     padding: 10px;
     background: #c0c0c0;
     border: 3px outset #c0c0c0;
+    opacity: 1;
 }
 
 .modal-head {
@@ -508,8 +508,8 @@ audio { width: 100%; display: block; }
     justify-content: space-between;
     gap: 10px;
     margin-bottom: 12px;
-    padding: 4px 8px;
-    background: linear-gradient(to bottom, #000080 0%, #1084d0 100%);
+    padding: 3px 8px;
+    background: #000080;
     color: #ffffff;
     border: 2px outset #c0c0c0;
 }
@@ -545,13 +545,13 @@ audio { width: 100%; display: block; }
     gap: 4px;
 }
 .model-list li {
-    padding: 4px 8px;
+    padding: 3px 8px;
     font-family: Arial, Helvetica, sans-serif;
     font-size: 12px;
     background: #ffffff;
     border: 2px inset #c0c0c0;
 }
-.model-list li::before { content: "♪ "; color: #000080; }
+.model-list li::before { content: "\266A "; color: #000080; }
 
 .footer {
     margin-top: 8px;

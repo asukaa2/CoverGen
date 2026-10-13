@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -7,8 +7,8 @@
     <link rel="icon" href="/favicon.ico" type="image/svg+xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap" rel="stylesheet" />
-
+    <link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/static/styles.css" />
 </head>
 <body>
     <div class="bg-glow" aria-hidden="true"></div>
@@ -28,6 +28,9 @@
             </div>
             <button class="theme-toggle" id="themeToggle" type="button" title="Toggle light / dark theme" aria-label="Toggle theme">
                 <span id="themeIcon">☾</span>
+            </button>
+            <button class="theme-toggle" id="customizeTheme" type="button" title="Customize theme" aria-label="Customize theme">
+                <span>🎨</span>
             </button>
         </div>
     </header>
@@ -231,6 +234,7 @@
         </section>
     </main>
 
+    <!-- =================== Model manager modal =================== -->
     <div class="modal-backdrop hidden" id="modalBackdrop">
         <div class="modal" role="dialog" aria-modal="true">
             <div class="modal-head">
@@ -259,6 +263,139 @@
             </div>
 
             <div class="alert hidden" id="modalMsg"></div>
+        </div>
+    </div>
+
+    <!-- =================== Theme Customizer modal =================== -->
+    <div class="modal-backdrop hidden" id="custBackdrop">
+        <div class="modal" role="dialog" aria-modal="true" style="width:min(640px,100%);">
+            <div class="modal-head">
+                <h3>🎨 Theme Customizer</h3>
+                <button class="btn btn-ghost btn-icon" id="closeCust" type="button">✕</button>
+            </div>
+
+            <p class="cust-hint">
+                Tweak the live UI on the right (the form behind this dialog updates instantly).
+                Settings are saved to your browser's localStorage and re-applied on every visit.
+                You can also export the result as a custom CSS file and load it on another machine.
+            </p>
+
+            <!-- Presets -->
+            <div class="cust-section">
+                <label class="field-label">Presets</label>
+                <div class="cust-presets" id="custPresets">
+                    <button class="cust-preset" data-preset="gradio-soft">Gradio Soft (default)</button>
+                    <button class="cust-preset" data-preset="gradio-orange">Gradio Orange</button>
+                    <button class="cust-preset" data-preset="ocean-blue">Ocean Blue</button>
+                    <button class="cust-preset" data-preset="forest-green">Forest Green</button>
+                    <button class="cust-preset" data-preset="monochrome">Monochrome</button>
+                    <button class="cust-preset" data-preset="rose-pink">Rose Pink</button>
+                </div>
+            </div>
+
+            <!-- Colors -->
+            <div class="cust-section">
+                <label class="field-label">Colors</label>
+                <div class="cust-row">
+                    <label>Primary</label>
+                    <div class="color-wrap">
+                        <input type="color" id="custPrimary" value="#f97316" />
+                        <input type="text" id="custPrimaryText" value="#f97316" />
+                    </div>
+                </div>
+                <div class="cust-row">
+                    <label>Background</label>
+                    <div class="color-wrap">
+                        <input type="color" id="custBg" value="#f7f7f8" />
+                        <input type="text" id="custBgText" value="#f7f7f8" />
+                    </div>
+                </div>
+                <div class="cust-row">
+                    <label>Panel</label>
+                    <div class="color-wrap">
+                        <input type="color" id="custPanel" value="#ffffff" />
+                        <input type="text" id="custPanelText" value="#ffffff" />
+                    </div>
+                </div>
+                <div class="cust-row">
+                    <label>Text</label>
+                    <div class="color-wrap">
+                        <input type="color" id="custText" value="#1f2937" />
+                        <input type="text" id="custTextText" value="#1f2937" />
+                    </div>
+                </div>
+                <div class="cust-row">
+                    <label>Border</label>
+                    <div class="color-wrap">
+                        <input type="color" id="custBorder" value="#e5e7eb" />
+                        <input type="text" id="custBorderText" value="#e5e7eb" />
+                    </div>
+                </div>
+                <div class="cust-row">
+                    <label>Primary hover</label>
+                    <div class="color-wrap">
+                        <input type="color" id="custPrimaryHover" value="#ea580c" />
+                        <input type="text" id="custPrimaryHoverText" value="#ea580c" />
+                    </div>
+                </div>
+            </div>
+
+            <!-- Body style -->
+            <div class="cust-section">
+                <label class="field-label">Body style</label>
+                <div class="cust-row">
+                    <label>Font family</label>
+                    <select id="custFont">
+                        <option value='Source Sans Pro, "Source Sans Pro", system-ui, sans-serif'>Source Sans Pro (Gradio default)</option>
+                        <option value='Inter, system-ui, sans-serif'>Inter</option>
+                        <option value='system-ui, -apple-system, "Segoe UI", Roboto, sans-serif'>System UI</option>
+                        <option value='Roboto, "Helvetica Neue", Arial, sans-serif'>Roboto</option>
+                        <option value='Georgia, "Times New Roman", serif'>Georgia (serif)</option>
+                        <option value='"Courier New", ui-monospace, monospace'>Courier (mono)</option>
+                        <option value='Arial, "Helvetica Neue", sans-serif'>Arial</option>
+                        <option value='"Trebuchet MS", sans-serif'>Trebuchet MS</option>
+                    </select>
+                </div>
+                <div class="cust-row">
+                    <label>Font size</label>
+                    <input type="range" id="custFontSize" min="12" max="18" step="1" value="14" />
+                </div>
+                <div class="cust-row">
+                    <label>Border radius</label>
+                    <input type="range" id="custRadius" min="0" max="20" step="1" value="8" />
+                </div>
+                <div class="cust-row">
+                    <label>Panel padding</label>
+                    <input type="range" id="custPanelPad" min="8" max="40" step="1" value="20" />
+                </div>
+                <div class="cust-row">
+                    <label>Max width</label>
+                    <input type="number" id="custMaxWidth" min="640" max="1600" step="20" value="1180" />
+                </div>
+            </div>
+
+            <!-- Custom CSS -->
+            <div class="cust-section">
+                <label class="field-label">Custom CSS overrides</label>
+                <p class="cust-hint">
+                    Anything you put here is appended after the theme tokens, so it overrides everything.
+                    You can use any CSS variable defined above, e.g. <code>background: var(--c-primary);</code>.
+                </p>
+                <textarea class="cust-textarea" id="custCss" placeholder="/* example: hide the topbar brand */
+.topbar { border-radius: 0 0 12px 12px; }"></textarea>
+            </div>
+
+            <!-- Actions -->
+            <div class="cust-actions">
+                <button class="btn btn-primary" id="custSave" type="button">💾 Save</button>
+                <button class="btn" id="custApply" type="button">↻ Apply (preview)</button>
+                <button class="btn" id="custExport" type="button">⤓ Export CSS</button>
+                <button class="btn" id="custImport" type="button">⤒ Import CSS</button>
+                <button class="btn btn-ghost" id="custReset" type="button">↺ Reset to defaults</button>
+            </div>
+
+            <input type="file" id="custImportFile" accept=".css,text/css" style="display:none" />
+            <div class="alert hidden" id="custMsg"></div>
         </div>
     </div>
 

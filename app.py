@@ -17,13 +17,20 @@ from gradio.data_classes import FileData
 
 BASE_DIR = os.path.join(os.getcwd(), 'rvc')
 STATIC_DIR = os. path.join(BASE_DIR, 'static')
-RVC_MODELS_DIR = os. path.join(BASE_DIR, 'assets', 'rvc_models')
-OUTPUT_DIR = os. path.join(BASE_DIR, 'assets', 'song_output')
+RVC_MODELS_DIR = os. path.join(os.getcwd(), 'assets', 'rvc_models')
+OUTPUT_DIR = os. path.join(os.getcwd(), 'assets', 'song_output')
 
 # The inference pipeline (core.py, rvc/*, tools/*) lives at the project root
 # and uses intra-package imports, so make sure it's importable.
 SRC_DIR = os.getcwd()
 sys.path.insert(0, str(SRC_DIR))
+
+# StaticFiles() raises if the directory doesn't exist, and these dirs may
+# not be present on a fresh checkout. Create them up front, before any
+# app.mount() call (and before the server is launched via __main__).
+os.makedirs(STATIC_DIR, exist_ok=True)
+os.makedirs(RVC_MODELS_DIR, exist_ok=True)
+os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 from core import song_cover_pipeline  # noqa: E402
 
@@ -246,16 +253,23 @@ def run_cover_pipeline(
     if voice_model not in list_voice_models():
         raise ValueError(f'Voice model "{voice_model}" was not found. Refresh the model list.')
 
-    # MDX-Net separation models are not auto-downloaded; fail fast with a clear message.
-    missing_mdx = [
-        name for name in ('Kim_Vocal_2.onnx', 'UVR_MDXNET_KARA_2.onnx', 'Reverb_HQ_By_FoxJoy.onnx')
-        if not (BASE_DIR / 'mdxnet_models' / name).exists()
+    # Separator models are not auto-downloaded; fail fast with a clear message.
+    # The filenames here must match the VOCAL_INST_MODEL / DEREVERB_MODEL /
+    # KARAOKE_MODEL constants at the top of core.py.
+    separator_models_dir = os.path.join(os.getcwd(), 'assets', 'separator_models')
+    missing_sep = [
+        name for name in (
+            'model_bs_roformer_ep_317_sdr_12.9755.ckpt',
+            'UVR-DeEcho-DeReverb.pth',
+            'mel_band_roformer_karaoke_aufr33_viperx_sdr_10.1956.ckpt',
+        )
+        if not os.path.exists(os.path.join(separator_models_dir, name))
     ]
-    if missing_mdx:
+    if missing_sep:
         raise ValueError(
-            'Missing MDX-Net separation model(s): '
-            + ', '.join(missing_mdx)
-            + '. Run "python src/download_models.py" first.'
+            'Missing separation model(s): '
+            + ', '.join(missing_sep)
+            + f'. Place them in {separator_models_dir}.'
         )
 
     output_format = output_format.lower() if output_format else 'mp3'
@@ -420,10 +434,15 @@ async def rest_generate_cover(
     media_type = AUDIO_MEDIA_TYPES.get(cover_path.suffix.lstrip('.').lower(), 'application/octet-stream')
 
     # List intermediate stem files (result_paths[1:]) as relative URLs.
+    # Stems live under OUTPUT_DIR and are served from the /song_output/ route.
     stems = []
     for stem_path in result_paths[1:]:
-        relative = Path(stem_path).relative_to(BASE_DIR).as_posix()
-        stems.append(f'/song_output/{urllib.parse.quote(relative[len("song_output/"):])}')
+        try:
+            relative = Path(stem_path).resolve().relative_to(OUTPUT_DIR).as_posix()
+        except ValueError:
+            # Stem lives outside the public output dir — skip it.
+            continue
+        stems.append(f'/song_output/{urllib.parse.quote(relative)}')
 
     headers = {
         'X-Output-Filename': urllib.parse.quote(cover_path.name),
@@ -464,8 +483,8 @@ if __name__ == '__main__':
     parser.add_argument('--share', action='store_true', help='Create a public Gradio share link.')
     args = parser.parse_args()
 
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
-
+    # OUTPUT_DIR is already created at import time (above), so nothing to
+    # do here except launch the server.
     app.launch(
         server_name=args.host,
         server_port=args.port,

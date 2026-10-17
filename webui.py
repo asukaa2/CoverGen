@@ -1,16 +1,23 @@
 import json
 import os
 import shutil
+import sys
 import urllib.request
 import zipfile
-import gdown
 from argparse import ArgumentParser
+
+# Optional: only required for Google Drive model downloads.
+try:
+    import gdown
+except ImportError:  # pragma: no cover
+    gdown = None
 
 import gradio as gr
 
-from core import song_cover_pipeline
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, BASE_DIR)
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+from core import song_cover_pipeline
 
 rvc_models_dir = os.path.join(BASE_DIR, 'assets', 'rvc_models')
 
@@ -63,6 +70,11 @@ def download_online_model(url, dir_name, progress=gr.Progress()):
             url = f'https://pixeldrain.com/api/file/{zip_name}'
             urllib.request.urlretrieve(url, zip_name)
         elif 'drive.google.com' in url:
+            if gdown is None:
+                raise ImportError(
+                    'Google Drive downloads require the "gdown" package. '
+                    'Install it with: pip install gdown'
+                )
             zip_name = dir_name + '.zip'
             file_id = url.split('/')[-2]
             output = os.path.join('.', f'{dir_name}.zip')

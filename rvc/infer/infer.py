@@ -1,9 +1,16 @@
 import os
+import sys
 
 import torch
 from scipy.io import wavfile
 
-from infer_pack.models import (
+# Make the project root importable so ``rvc.*`` packages always resolve,
+# no matter which directory the server was launched from.
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if _PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, _PROJECT_ROOT)
+
+from rvc.modules.infer_pack.models import (
     SynthesizerTrnMs256NSFsid,
     SynthesizerTrnMs256NSFsid_nono,
     SynthesizerTrnMs768NSFsid,
@@ -11,10 +18,21 @@ from infer_pack.models import (
 )
 from rvc.infer.my_utils import load_audio
 from rvc.infer.pipeline import VC
-from rvc.modules.predictor.utils import check_rvc.modules.predictors, check_embedders, MODELS_DIR
+from rvc.modules.predictor.utils import check_predictors, check_embedders, MODELS_DIR
 
-# Local fairseq implementation (src/tools/fairseq.py) - replaces the pip "fairseq" package.
-from tools.fairseq import load_model as load_fairseq_model
+# Local fairseq implementation (tools/fairseq.py) - replaces the pip "fairseq" package.
+# Falls back to the official ``fairseq`` package if available.
+try:
+    from tools.fairseq import load_model as load_fairseq_model
+except ImportError:
+    try:
+        from fairseq import load_model as load_fairseq_model
+    except ImportError as exc:
+        raise ImportError(
+            "Could not load a fairseq implementation. Either place a local "
+            "'tools/fairseq.py' module in the project root, or install the "
+            "'fairseq' package via pip."
+        ) from exc
 
 
 class Config:

@@ -9,10 +9,14 @@ import gc
 import re
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-now_dir = os.path.join(BASE_DIR, 'src')
-sys.path.append(now_dir)
+# Make the project root importable so ``rvc.modules.predictor.*`` resolves
+# regardless of where the server was launched from.
+# BASE_DIR is ``<project>/rvc`` so its parent is the project root.
+_PROJECT_ROOT = os.path.dirname(BASE_DIR)
+if _PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, _PROJECT_ROOT)
 
-from predictor.generator import Generator, Autotune, post_process
+from rvc.modules.predictor.generator import Generator, Autotune, post_process
 
 bh, ah = signal.butter(N=5, Wn=48, btype="high", fs=16000)
 

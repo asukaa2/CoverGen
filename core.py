@@ -5,10 +5,21 @@ import json
 import os
 import shlex
 import subprocess
+import sys
 from contextlib import suppress
 from urllib.parse import urlparse, parse_qs
 
-import gradio as gr
+# Make the project root importable so ``rvc.*`` packages always resolve,
+# no matter which directory the server was launched from.
+_PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+if _PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, _PROJECT_ROOT)
+# The vendored ``audio_separator`` package lives under ``rvc/modules/`` and
+# uses top-level ``audio_separator.*`` imports internally.
+_AUDIO_SEP_PARENT = os.path.join(_PROJECT_ROOT, 'rvc', 'modules')
+if _AUDIO_SEP_PARENT not in sys.path:
+    sys.path.insert(0, _AUDIO_SEP_PARENT)
+
 import librosa
 import numpy as np
 import soundfile as sf
@@ -17,11 +28,17 @@ import yt_dlp
 
 from pydub import AudioSegment
 
+# Optional: only needed when running as a Gradio webui (webui.py).
+try:
+    import gradio as gr
+except Exception:  # pragma: no cover - gradio is optional for the REST API
+    gr = None
+
 from rvc.modules.audio_separator.separator import Separator
 
 from rvc.infer.infer import Config, get_vc, rvc_infer
 
-BASE_DIR = os.getcwd()
+BASE_DIR = _PROJECT_ROOT
 
 separator_models_dir = os.path.join(BASE_DIR, 'assets', 'separator_models')
 rvc_models_dir = os.path.join(BASE_DIR, 'assets', 'rvc_models')
@@ -76,7 +93,7 @@ def yt_download(link):
 
 
 def raise_exception(error_msg, is_webui):
-    if is_webui:
+    if is_webui and gr is not None:
         raise gr.Error(error_msg)
     else:
         raise Exception(error_msg)
@@ -175,7 +192,7 @@ def preprocess_song(song_input, song_id, is_webui, input_type, progress=None):
 
     # 1) Split vocals from instrumental
     display_progress('[~] Separating vocals from instrumental...', 0.1, is_webui, progress)
-    separator = Separator(output_dir=song_output_dir, output_format='wav')
+    separator = Separator(model_file_dir=separator_models_dir, output_dir=song_output_dir, output_format='wav')
     separator.load_model(model_filename=VOCAL_INST_MODEL)
     voc_inst = separator.separate(orig_song_path)
 
@@ -194,7 +211,7 @@ def preprocess_song(song_input, song_id, is_webui, input_type, progress=None):
 
     # 2) DeReverb vocals
     display_progress('[~] Applying DeReverb to vocals...', 0.3, is_webui, progress)
-    separator = Separator(output_dir=song_output_dir, output_format='wav')
+    separator = Separator(model_file_dir=separator_models_dir, output_dir=song_output_dir, output_format='wav')
     separator.load_model(model_filename=DEREVERB_MODEL)
     voc_no_reverb = separator.separate(vocals_path)
 
@@ -215,7 +232,7 @@ def preprocess_song(song_input, song_id, is_webui, input_type, progress=None):
 
     # 3) Split main vocals vs backup vocals
     display_progress('[~] Splitting main vocals and backup vocals...', 0.2, is_webui, progress)
-    separator = Separator(output_dir=song_output_dir, output_format='wav')
+    separator = Separator(model_file_dir=separator_models_dir, output_dir=song_output_dir, output_format='wav')
     separator.load_model(model_filename=KARAOKE_MODEL)
     backing_voc = separator.separate(main_vocals_dereverb_path)
 
@@ -329,7 +346,6 @@ def song_cover_pipeline(song_input, voice_model, pitch_change, keep_files, is_we
 
         return [ai_cover_path, ai_vocals_path, main_vocals_dereverb_path, backup_vocals_path, instrumentals_path]
 
-
     except Exception as e:
         raise_exception(str(e), is_webui)
 
@@ -359,11 +375,13 @@ if __name__ == '__main__':
     if not os.path.exists(os.path.join(rvc_models_dir, rvc_dirname)):
         raise Exception(f'The folder {os.path.join(rvc_models_dir, rvc_dirname)} was not found.')
 
-    cover_path = song_cover_pipeline(args.song_input, rvc_dirname, args.pitch_change, args.keep_files,
+    cover_paths = song_cover_pipeline(args.song_input, rvc_dirname, args.pitch_change, args.keep_files,
                                      main_gain=args.main_vol, backup_gain=args.backup_vol, inst_gain=args.inst_vol,
                                      index_rate=args.index_rate, filter_radius=args.filter_radius,
                                      rms_mix_rate=args.rms_mix_rate, f0_method=args.pitch_detection_algo,
                                      crepe_hop_length=args.crepe_hop_length, protect=args.protect,
                                      output_format=args.output_format, f0autotune=args.autotune,
                                      f0_min=args.minimum_pitch, f0_max=args.maximum_pitch)
+    # song_cover_pipeline returns a list; the first element is the final cover.
+    cover_path = cover_paths[0] if isinstance(cover_paths, list) and cover_paths else cover_paths
     print(f'[+] Cover created at {cover_path}')

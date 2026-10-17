@@ -6,7 +6,7 @@ sys.path.append(current_dir)
 
 
 
-from .separator import Separator
-from .exceptions import AudioExportError, BatchSeparationError, InvalidAudioDataError
+from rvc.modules.audio_separator.separator import Separator
+from rvc.modules.audio_separator.exceptions import AudioExportError, BatchSeparationError, InvalidAudioDataError
 
 __all__ = ["AudioExportError", "BatchSeparationError", "InvalidAudioDataError", "Separator"]

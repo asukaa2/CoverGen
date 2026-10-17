@@ -126,8 +126,8 @@ if __name__ == '__main__':
     voice_models = get_current_models(rvc_models_dir)
 
     with gr.Blocks(title='CoverGen - AsukaDev') as app:
-    	gr.Label("CoverGen V3", show_label=False) 
-        with gr.Tab("CoverGen"):
+        gr.Label("CoverGen V3", show_label=False) 
+        with gr.Tabs("CoverGen"):
             with gr.Row():
                 with gr.Column():
                     rvc_model = gr.Dropdown(voice_models, label='Voice Models', info='Directory "CoverGen/rvc_models". After adding new models to this directory, click the "Refresh Models List" button')
@@ -208,8 +208,8 @@ if __name__ == '__main__':
                                     f0autotune, f0_min, f0_max,
                                     ai_cover, ai_vocals, main_vocals_dereverb, backup_vocals, instrumentals])
 
-        with gr.Tab('Model Upload'):
-            with gr.Tab('Upload via Link'):
+        with gr.Tabs('Model Upload'):
+            with gr.Tabs('Upload via Link'):
                 with gr.Row():
                     model_zip_link = gr.Text(label='Model Download Link', info='This should be a link to a zip file containing a .pth model file and an optional .index file.', scale = 3)
                     model_name = gr.Text(label='Model Name', info='Give your uploaded model a unique name, different from other voice models.', scale = 1.5)
@@ -220,7 +220,7 @@ if __name__ == '__main__':
 
                 download_btn.click(download_online_model, inputs=[model_zip_link, model_name], outputs=dl_output_message)
 
-            with gr.Tab('Upload Locally'):
+            with gr.Tabs('Upload Locally'):
                 gr.Markdown('## Upload a locally trained RVC v2 model and index file')
                 gr.Markdown('- Find the model file (weights folder) and optional index file (logs/[name] folder)')
                 gr.Markdown('- Compress the files into a zip file')

@@ -6,7 +6,7 @@ CoverGen bundles three pieces:
 
 1. A **vocal/instrument separator** (vendored `audio_separator` package — MDX, VR, Demucs, Roformer architectures).
 2. A **voice-conversion engine** (RVC v1/v2 inference pipeline with multiple F0 trackers: rmvpe+, fcpe, crepe/mangio-crepe, harvest, dio, yin, pyin).
-3. A **FastAPI backend** + a small static frontend (HTML/CSS/JS), plus an optional Gradio web UI for power users.
+3. A **Gradio Server backend** (`app.py`) that exposes both a gradio-compatible API and plain FastAPI REST routes, plus an optional pure-Gradio web UI (`webui.py`).
 
 ---
 
@@ -15,9 +15,10 @@ CoverGen bundles three pieces:
 - **Three input modes**: YouTube link, local audio file path, or browser upload.
 - **Multi-stage pipeline**: vocals/instrumental split → dereverb → main/backup vocal split → RVC voice conversion → final mix.
 - **Multiple F0 methods** including hybrid combinations (e.g. `hybrid[rmvpe+fcpe]`).
-- **REST API** for programmatic access — every feature exposed at `/api/*`.
-- **Optional Gradio UI** (`webui.py`) for users who prefer the classic RVC webui look.
+- **Gradio Server API** (`app.py`) — exposes both `@app.api(...)` endpoints (gradio_client compatible) and plain REST routes at `/api/*`.
+- **Optional pure-Gradio UI** (`webui.py`) for users who prefer the classic RVC webui look.
 - **CPU + GPU + Apple MPS** inference (auto-selected by torch).
+- **Local tools/** — `tools/gdown.py` (Google Drive downloader) and `tools/fairseq.py` (HuBERT/ContentVec loader) replace pip packages.
 
 ---
 
@@ -25,12 +26,13 @@ CoverGen bundles three pieces:
 
 ```
 CoverGen/
-├── app.py                 # FastAPI backend (REST API + static frontend)
-├── webui.py               # Optional Gradio web UI
+├── app.py                 # Gradio Server backend (gradio API + REST routes + static frontend)
+├── webui.py               # Optional pure-Gradio web UI
 ├── core.py                # Pipeline: yt download → separate → RVC → mix
 ├── requirements.txt       # Python dependencies
 ├── tools/
-│   └── fairseq.py         # Local HuBERT/ContentVec loader (replaces pip fairseq)
+│   ├── fairseq.py         # Local HuBERT/ContentVec loader (replaces pip fairseq)
+│   └── gdown.py           # Local Google Drive downloader (replaces pip gdown)
 ├── rvc/
 │   ├── static/            # HTML/CSS/JS frontend for app.py
 │   ├── infer/             # RVC inference (Config, get_vc, pipeline)
@@ -94,9 +96,9 @@ You can find these on the [UVR models archive](https://github.com/TRvlvr/model_s
 python app.py --host 127.0.0.1 --port 7860
 ```
 
-Open <http://127.0.0.1:7860> in your browser, pick a voice model, paste a YouTube URL or upload an audio file, and click **Generate AI Cover**.
+The server launches via `app.launch(...)` (Gradio Server mode). Open <http://127.0.0.1:7860> in your browser, pick a voice model, paste a YouTube URL or upload an audio file, and click **Generate AI Cover**.
 
-### 5. (Optional) Use the Gradio UI instead
+### 5. (Optional) Use the pure-Gradio UI instead
 
 ```bash
 python webui.py --listen --listen-port 7860
@@ -205,7 +207,6 @@ Final AI cover (mp3 / flac / wav)
 Intermediate files are written to `assets/song_output/<song_id>/` and deleted when `keep_files=False`.
 
 ---
-
 
 
 ## License

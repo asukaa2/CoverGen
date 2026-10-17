@@ -20,6 +20,7 @@ _AUDIO_SEP_PARENT = os.path.join(_PROJECT_ROOT, 'rvc', 'modules')
 if _AUDIO_SEP_PARENT not in sys.path:
     sys.path.insert(0, _AUDIO_SEP_PARENT)
 
+import gradio as gr
 import librosa
 import numpy as np
 import soundfile as sf
@@ -27,12 +28,6 @@ import torch
 import yt_dlp
 
 from pydub import AudioSegment
-
-# Optional: only needed when running as a Gradio webui (webui.py).
-try:
-    import gradio as gr
-except Exception:  # pragma: no cover - gradio is optional for the REST API
-    gr = None
 
 from rvc.modules.audio_separator.separator import Separator
 
@@ -93,7 +88,7 @@ def yt_download(link):
 
 
 def raise_exception(error_msg, is_webui):
-    if is_webui and gr is not None:
+    if is_webui:
         raise gr.Error(error_msg)
     else:
         raise Exception(error_msg)

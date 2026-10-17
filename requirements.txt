@@ -1,67 +1,62 @@
-# ─────────────────────────────────────────────────────────────
-# CoverGen Python dependencies
-# Install with:  pip install -r requirements.txt
-# ─────────────────────────────────────────────────────────────
-
-# Build tooling
+# Platform-specific requirements section
 pip>=23.3
 wheel
-setuptools>=68.0
 omegaconf>=2.0.6
+setuptools==81.0.0
+webrtcvad-wheels>=2.0.14
 
-# ── Web framework (REST API in app.py) ─────────────────────────
-fastapi>=0.110
-uvicorn[standard]>=0.27
-python-multipart>=0.0.9        # required by FastAPI for Form()/File() uploads
-
-# ── Optional Gradio web UI (webui.py) ──────────────────────────
-gradio>=4.0
-gdown>=4.7                     # Google Drive model downloads (optional)
-
-# ── Audio / ML core ────────────────────────────────────────────
-torch>=2.3.1
-torchaudio>=2.3.1
-torchvision>=0.18.1
-numpy>=1.25,<2.0
-librosa>=0.10.2
-soundfile>=0.13.0
-pydub>=0.25.1
-scipy>=1.10
-praat-parselmouth>=0.4
-pedalboard>=0.8
-ffmpeg-python>=0.2
-
-# faiss: pre-built CPU wheel for the v1/v2 RVC index lookups
-faiss-cpu>=1.7.3
-
-# ── Pitch trackers & embedder helpers ──────────────────────────
-transformers>=4.40
-scikit-learn>=1.3
-einops>=0.8.0
-numba>=0.57
-tqdm>=4.65
-
-# ── ONNX runtime (used by the audio separator) ─────────────────
-# Use onnxruntime-gpu on CUDA boxes; onnxruntime on CPU/Mac.
 onnxruntime; sys_platform == 'darwin'
 onnxruntime-gpu; sys_platform != 'darwin'
 
-# ── YouTube / web fetching ─────────────────────────────────────
-yt-dlp>=2024.0
-requests>=2.31
-aiohttp>=3.9
-beautifulsoup4>=4.12
+# Core dependencies
 PyYAML>=6.0
-
-# ── Misc utilities ─────────────────────────────────────────────
-matplotlib>=3.7
 tiktoken
 hyperpyyaml
-pysrt
-edge-tts>=6.1
-cffi>=1.16
-webrtcvad-wheels>=2.0.10
+torch>=2.3.1
+tqdm>=4.63.1
+torchvision>=0.18.1
+torchaudio>=2.3.1
+torchcodec==0.9.1
 
-# ── Optional: native fairseq (for HuBERT/ContentVec loaders) ───
-# If not installed, tools/fairseq.py falls back to torch.hub.
-# fairseq
+faiss-cpu==1.7.3; python_version < "3.12"
+faiss-cpu>=1.7.3; python_version >= "3.12"
+
+# Machine learning, NLP and deep learning
+transformers>=4.49.0
+scikit-learn
+einops>=0.8.0
+
+# Pitch and sound processing
+librosa>=0.10.2
+pydub>=0.25.1
+praat-parselmouth
+soundfile>=0.13.0
+pedalboard
+
+# Data processing and calculation
+numpy>=1.25.2
+numba>=0.57.0
+scipy>=1.15.0
+matplotlib>=3.7.2
+
+# Implementation and web framework
+gradio>=6.30
+requests>=2.32.3
+aiohttp
+pysrt
+
+# Utility section
+yt-dlp>=2026.03.17
+edge-tts>=7.2.7
+beautifulsoup4
+cffi>=2.0.0
+
+# Tensorboard and ONNX
+tensorboard
+onnx>=1.14
+onnxslim
+onnxscript
+onnx2torch>=1.5.15
+
+# Cryptography section
+pycryptodome>=3.9.6,<4.0.0

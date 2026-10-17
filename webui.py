@@ -6,11 +6,8 @@ import urllib.request
 import zipfile
 from argparse import ArgumentParser
 
-# Optional: only required for Google Drive model downloads.
-try:
-    import gdown
-except ImportError:  # pragma: no cover
-    gdown = None
+# Local Google Drive downloader (no pip gdown dependency).
+from tools.gdown import download as gdown_download
 
 import gradio as gr
 
@@ -70,15 +67,10 @@ def download_online_model(url, dir_name, progress=gr.Progress()):
             url = f'https://pixeldrain.com/api/file/{zip_name}'
             urllib.request.urlretrieve(url, zip_name)
         elif 'drive.google.com' in url:
-            if gdown is None:
-                raise ImportError(
-                    'Google Drive downloads require the "gdown" package. '
-                    'Install it with: pip install gdown'
-                )
             zip_name = dir_name + '.zip'
             file_id = url.split('/')[-2]
             output = os.path.join('.', f'{dir_name}.zip')
-            gdown.download(id=file_id, output=output, quiet=False)
+            gdown_download(id=file_id, output=output, quiet=False)
 
         progress(0.5, desc='[~] Extracting zip file...')
         extract_zip(extraction_folder, zip_name)

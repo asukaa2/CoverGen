@@ -206,25 +206,7 @@ Intermediate files are written to `assets/song_output/<song_id>/` and deleted wh
 
 ---
 
-## Troubleshooting
 
-**`No module named 'fairseq'`** — Install the optional `fairseq` package, or rely on `tools/fairseq.py` which loads HuBERT via `torch.hub`. If `torch.hub` fails, install `fairseq` explicitly:
-
-```bash
-pip install fairseq
-```
-
-**`No .pth model file was found in the extracted zip`** — The zip must contain a `.pth` file larger than 40 MB. Some RVC model zips ship the weights inside a nested folder; CoverGen will walk the zip recursively, but very small `.pth` files are skipped to avoid picking up unrelated checkpoints.
-
-**`Missing MDX-Net separation model(s)`** — Copy the three separator model files listed in step 3 above into `assets/separator_models/`.
-
-**`Could not load a fairseq/HuBERT model`** — The embedder file (e.g. `hubert_base.pt`) is missing from `models/` or `assets/rvc_models/`. Let the pipeline auto-download it on first run, or download it manually from the [RVC v2 models repo](https://huggingface.co/lj1995/VoiceConversionWebUI).
-
-**Pitch detection is slow / inaccurate** — `rmvpe+` is the recommended default. For smoother vocals try `mangio-crepe` with a larger `crepe_hop_length` (256+). For fastest CPU inference use `pm` or `dio`.
-
-See `docs/` for more guides.
-
----
 
 ## License
 

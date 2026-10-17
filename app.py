@@ -17,8 +17,8 @@ from gradio.data_classes import FileData
 
 BASE_DIR = os.path.join(os.getcwd(), 'rvc')
 STATIC_DIR = os. path.join(BASE_DIR, 'static')
-RVC_MODELS_DIR = os. path.join(BASE_DIR, 'rvc_models')
-OUTPUT_DIR = os. path.join(BASE_DIR, 'song_output')
+RVC_MODELS_DIR = os. path.join(BASE_DIR, 'assets', 'rvc_models')
+OUTPUT_DIR = os. path.join(BASE_DIR, 'assets', 'song_output')
 
 # The inference pipeline (core.py, rvc/*, tools/*) lives at the project root
 # and uses intra-package imports, so make sure it's importable.

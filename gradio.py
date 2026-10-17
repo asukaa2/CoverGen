@@ -126,7 +126,7 @@ if __name__ == '__main__':
     voice_models = get_current_models(rvc_models_dir)
 
     with gr.Blocks(title='CoverGen - AsukaDev') as app:
-    	gr.Label("CoverGen V3") 
+    	gr.Label("CoverGen V3", show_label=False) 
         with gr.Tab("CoverGen"):
             with gr.Row():
                 with gr.Column():

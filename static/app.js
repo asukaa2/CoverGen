@@ -1,15 +1,3 @@
-/* ============================================================
-   CoverGen frontend logic
-   Talks to the Python gradio.Server backend over plain REST:
-   - POST /api/cover  -> the response body IS the audio file
-     (audio/mpeg | audio/flac | audio/wav) - never JSON. It is
-     turned into a blob URL and fed straight to the player.
-   - GET  /api/models -> JSON list (metadata only)
-   - POST /api/models/download | /api/models/upload
-   Stems are fetched from /song_output/<file> (real audio files).
-   ============================================================ */
-
-/* ---------------- element handles ---------------- */
 const $ = (id) => document.getElementById(id);
 
 const el = {

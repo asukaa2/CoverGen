@@ -17,7 +17,7 @@ import yt_dlp
 
 from pydub import AudioSegment
 
-from audio_separator.separator import Separator
+from rvc.audio_separator.separator import Separator
 
 from rvc.infer.infer import Config, get_vc, rvc_infer
 

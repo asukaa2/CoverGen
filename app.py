@@ -15,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from gradio import Server
 from gradio.data_classes import FileData
 
-BASE_DIR = os.path.join(os.getcwd(), 'rvc'
+BASE_DIR = os.path.join(os.getcwd(), 'rvc') 
 STATIC_DIR = os. path.join(BASE_DIR, 'static') 
 RVC_MODELS_DIR = os. path.join(BASE_DIR, 'rvc_models') 
 OUTPUT_DIR = os. path.join(BASE_DIR, 'song_output') 

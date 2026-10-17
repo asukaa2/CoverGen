@@ -15,12 +15,14 @@ from fastapi.staticfiles import StaticFiles
 from gradio import Server
 from gradio.data_classes import FileData
 
-BASE_DIR = os.path.join(os.getcwd(), 'rvc') 
-STATIC_DIR = os. path.join(BASE_DIR, 'static') 
-RVC_MODELS_DIR = os. path.join(BASE_DIR, 'rvc_models') 
-OUTPUT_DIR = os. path.join(BASE_DIR, 'song_output') 
+BASE_DIR = os.path.join(os.getcwd(), 'rvc')
+STATIC_DIR = os. path.join(BASE_DIR, 'static')
+RVC_MODELS_DIR = os. path.join(BASE_DIR, 'rvc_models')
+OUTPUT_DIR = os. path.join(BASE_DIR, 'song_output')
 
-# The inference pipeline lives in src/ and uses intra-package imports.
+# The inference pipeline (core.py, rvc/*, tools/*) lives at the project root
+# and uses intra-package imports, so make sure it's importable.
+SRC_DIR = os.getcwd()
 sys.path.insert(0, str(SRC_DIR))
 
 from core import song_cover_pipeline  # noqa: E402

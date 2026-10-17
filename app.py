@@ -1,26 +1,3 @@
-"""CoverGen backend built on gradio.Server.
-
-Architecture follows the official Gradio announcement:
-https://huggingface.co/blog/introducing-gradio-server
-
-- gradio.Server extends FastAPI: custom routes, middleware and static files
-  work natively, while Gradio's API engine adds queuing, SSE streaming,
-  concurrency control and gradio_client compatibility.
-- @app.api() endpoints are queued and callable through the Gradio JS client
-  and through gradio_client.
-- Plain FastAPI REST routes live alongside @app.api() endpoints:
-    GET  /api/models          -> JSON list of voice models
-    POST /api/cover           -> BINARY AUDIO (the generated AI cover file)
-    POST /api/models/download -> JSON status message
-    POST /api/models/upload   -> JSON status message
-  POST /api/cover returns the actual audio file (Content-Type audio/mpeg,
-  audio/flac, ...) - never JSON - so any client (browser, curl, mobile app)
-  receives playable audio directly.
-
-Run:
-    python server.py --host 0.0.0.0 --port 7860
-"""
-
 import json
 import os
 import shutil

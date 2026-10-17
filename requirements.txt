@@ -1,22 +1,62 @@
-requests
-gdown
-gradio>=6.30
+# Platform-specific requirements section
+pip>=23.3
+wheel
+omegaconf>=2.0.6
+setuptools==81.0.0
+webrtcvad-wheels>=2.0.14
+
+onnxruntime; sys_platform == 'darwin'
+onnxruntime-gpu; sys_platform != 'darwin'
+
+# Core dependencies
+PyYAML>=6.0
+tiktoken
+hyperpyyaml
+torch>=2.3.1
+tqdm>=4.63.1
+torchvision>=0.18.1
+torchaudio>=2.3.1
+torchcodec==0.9.1
+
+faiss-cpu==1.7.3; python_version < "3.12"
+faiss-cpu>=1.7.3; python_version >= "3.12"
+
+# Machine learning, NLP and deep learning
+transformers>=4.49.0
+scikit-learn
+einops>=0.8.0
+
+# Pitch and sound processing
 librosa>=0.10.2
-yt_dlp
-onnxruntime-gpu>=1.17
-torch
-torchaudio
-torchvision
-ffmpeg-python>=0.2.0
-praat-parselmouth>=0.4.2
-faiss-cpu>=1.7.3
-numpy>=1.25
+pydub>=0.25.1
+praat-parselmouth
+soundfile>=0.13.0
+pedalboard
+
+# Data processing and calculation
+numpy>=1.25.2
 numba>=0.57.0
-einops
-local-attention
-omegaconf
-pyworld
-tqdm
-soundfile
-scipy
-setuptools<81
+scipy>=1.15.0
+matplotlib>=3.7.2
+
+# Implementation and web framework
+gradio>=6.30
+requests>=2.32.3
+aiohttp
+pysrt
+
+# Utility section
+yt-dlp>=2026.03.17
+edge-tts>=7.2.7
+beautifulsoup4
+cffi>=2.0.0
+
+# Tensorboard and ONNX
+tensorboard
+onnx>=1.14
+onnxslim
+onnxscript
+onnx2torch>=1.5.15
+
+# Cryptography section
+pycryptodome>=3.9.6,<4.0.0

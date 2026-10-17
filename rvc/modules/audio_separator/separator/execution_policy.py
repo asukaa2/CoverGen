@@ -3,7 +3,12 @@
 from dataclasses import dataclass
 
 from packaging import version
-import torch
+import torch, os, sys
+current_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(current_dir)
+
+
+
 
 from audio_separator.separator.uvr_lib_v5.device_utils import supports_autocast
 

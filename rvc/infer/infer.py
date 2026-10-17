@@ -9,9 +9,9 @@ from infer_pack.models import (
     SynthesizerTrnMs768NSFsid,
     SynthesizerTrnMs768NSFsid_nono,
 )
-from infer.my_utils import load_audio
-from infer.pipeline import VC
-from predictor.utils import check_predictors, check_embedders, MODELS_DIR
+from rvc.infer.my_utils import load_audio
+from rvc.infer.pipeline import VC
+from rvc.modules.predictor.utils import check_rvc.modules.predictors, check_embedders, MODELS_DIR
 
 # Local fairseq implementation (src/tools/fairseq.py) - replaces the pip "fairseq" package.
 from tools.fairseq import load_model as load_fairseq_model
@@ -157,7 +157,7 @@ def rvc_infer(
     f0_min=50,
     f0_max=1100
 ):
-    # Download missing predictor/embedder files before inference.
+    # Download missing rvc.modules.predictor/embedder files before inference.
     check_predictors(f0_method)
     check_embedders(embedder_name)
 

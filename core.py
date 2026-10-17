@@ -17,14 +17,21 @@ import yt_dlp
 
 from pydub import AudioSegment
 
-from infer.mdx import run_mdx
-from infer.infer import Config, get_vc, rvc_infer
+from audio_separator.separator import Separator
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+from rvc.infer.infer import Config, get_vc, rvc_infer
 
-mdxnet_models_dir = os.path.join(BASE_DIR, 'mdxnet_models')
-rvc_models_dir = os.path.join(BASE_DIR, 'rvc_models')
-output_dir = os.path.join(BASE_DIR, 'song_output')
+BASE_DIR = os.getcwd()
+
+separator_models_dir = os.path.join(BASE_DIR, 'assets', 'separator_models')
+rvc_models_dir = os.path.join(BASE_DIR, 'assets', 'rvc_models')
+output_dir = os.path.join(BASE_DIR, 'assets', 'song_output')
+
+# Model filenames used by python-audio-separator.
+# Place these files inside `assets/separator_models` (or let the library download them).
+VOCAL_INST_MODEL = 'model_bs_roformer_ep_317_sdr_12.9755.ckpt'
+DEREVERB_MODEL = 'UVR-DeEcho-DeReverb.pth'
+KARAOKE_MODEL = 'mel_band_roformer_karaoke_aufr33_viperx_sdr_10.1956.ckpt'
 
 
 def get_youtube_video_id(url, ignore_playlist=True):
@@ -134,7 +141,21 @@ def display_progress(message, percent, is_webui, progress=None):
         print(message)
 
 
-def preprocess_song(song_input, mdx_model_params, song_id, is_webui, input_type, progress=None):
+def _find_output_file(output_files, keyword):
+    """Pick the file from a separator output list whose name contains `keyword`."""
+    for f in output_files:
+        if keyword.lower() in os.path.basename(f).lower():
+            return f
+    return None
+
+
+def _rename(src, dst):
+    if os.path.exists(dst):
+        os.remove(dst)
+    os.rename(src, dst)
+
+
+def preprocess_song(song_input, song_id, is_webui, input_type, progress=None):
     keep_orig = False
     if input_type == 'yt':
         display_progress('[~] Downloading song...', 0, is_webui, progress)
@@ -147,16 +168,68 @@ def preprocess_song(song_input, mdx_model_params, song_id, is_webui, input_type,
         orig_song_path = None
 
     song_output_dir = os.path.join(output_dir, song_id)
+    os.makedirs(song_output_dir, exist_ok=True)
     orig_song_path = convert_to_stereo(orig_song_path)
 
+    orig_basename = os.path.splitext(os.path.basename(orig_song_path))[0]
+
+    # 1) Split vocals from instrumental
     display_progress('[~] Separating vocals from instrumental...', 0.1, is_webui, progress)
-    vocals_path, instrumentals_path = run_mdx(mdx_model_params, song_output_dir, os.path.join(mdxnet_models_dir, 'Kim_Vocal_2.onnx'), orig_song_path, denoise=True, keep_orig=keep_orig)
+    separator = Separator(output_dir=song_output_dir, output_format='wav')
+    separator.load_model(model_filename=VOCAL_INST_MODEL)
+    voc_inst = separator.separate(orig_song_path)
 
-    display_progress('[~] Splitting main vocals and backup vocals...', 0.2, is_webui, progress)
-    backup_vocals_path, main_vocals_path = run_mdx(mdx_model_params, song_output_dir, os.path.join(mdxnet_models_dir, 'UVR_MDXNET_KARA_2.onnx'), vocals_path, suffix='Backup', invert_suffix='Main', denoise=True)
+    # Depending on model, order is (Vocals, Instrumental) or (Instrumental, Vocals).
+    vocals_src = _find_output_file(voc_inst, 'vocal')
+    inst_src = _find_output_file(voc_inst, 'instrument')
+    if vocals_src is None:
+        vocals_src = voc_inst[0]
+    if inst_src is None:
+        inst_src = voc_inst[1]
 
+    vocals_path = os.path.join(song_output_dir, f'{orig_basename}_Vocals.wav')
+    instrumentals_path = os.path.join(song_output_dir, f'{orig_basename}_Instrumental.wav')
+    _rename(vocals_src, vocals_path)
+    _rename(inst_src, instrumentals_path)
+
+    # 2) DeReverb vocals
     display_progress('[~] Applying DeReverb to vocals...', 0.3, is_webui, progress)
-    _, main_vocals_dereverb_path = run_mdx(mdx_model_params, song_output_dir, os.path.join(mdxnet_models_dir, 'Reverb_HQ_By_FoxJoy.onnx'), main_vocals_path, invert_suffix='DeReverb', exclude_main=True, denoise=True)
+    separator = Separator(output_dir=song_output_dir, output_format='wav')
+    separator.load_model(model_filename=DEREVERB_MODEL)
+    voc_no_reverb = separator.separate(vocals_path)
+
+    # UVR-DeEcho-DeReverb returns (No Reverb, Reverb)
+    no_reverb_src = _find_output_file(voc_no_reverb, 'no reverb')
+    if no_reverb_src is None:
+        no_reverb_src = voc_no_reverb[0]
+    reverb_src = _find_output_file(voc_no_reverb, 'reverb')
+    if reverb_src is not None and reverb_src == no_reverb_src:
+        reverb_src = None
+
+    main_vocals_dereverb_path = os.path.join(song_output_dir, f'{orig_basename}_Vocals_Main_DeReverb.wav')
+    _rename(no_reverb_src, main_vocals_dereverb_path)
+
+    # Keep/remove the leftover reverb file
+    if reverb_src is not None and os.path.exists(reverb_src):
+        os.remove(reverb_src)
+
+    # 3) Split main vocals vs backup vocals
+    display_progress('[~] Splitting main vocals and backup vocals...', 0.2, is_webui, progress)
+    separator = Separator(output_dir=song_output_dir, output_format='wav')
+    separator.load_model(model_filename=KARAOKE_MODEL)
+    backing_voc = separator.separate(main_vocals_dereverb_path)
+
+    backing_src = _find_output_file(backing_voc, 'back')
+    if backing_src is None:
+        backing_src = backing_voc[0]
+    lead_src = _find_output_file(backing_voc, 'lead')
+    if lead_src is None:
+        lead_src = backing_voc[1]
+
+    backup_vocals_path = os.path.join(song_output_dir, f'{orig_basename}_Vocals_Backup.wav')
+    main_vocals_path = os.path.join(song_output_dir, f'{orig_basename}_Vocals_Main.wav')
+    _rename(backing_src, backup_vocals_path)
+    _rename(lead_src, main_vocals_path)
 
     return orig_song_path, vocals_path, instrumentals_path, main_vocals_path, backup_vocals_path, main_vocals_dereverb_path
 
@@ -200,9 +273,6 @@ def song_cover_pipeline(song_input, voice_model, pitch_change, keep_files, is_we
 
         display_progress('[~] Starting AI cover generation pipeline...', 0, is_webui, progress)
 
-        with open(os.path.join(mdxnet_models_dir, 'model_data.json')) as infile:
-            mdx_model_params = json.load(infile)
-
         if urlparse(song_input).scheme == 'https':
             input_type = 'yt'
             song_id = get_youtube_video_id(song_input)
@@ -223,13 +293,13 @@ def song_cover_pipeline(song_input, voice_model, pitch_change, keep_files, is_we
 
         if not os.path.exists(song_dir):
             os.makedirs(song_dir)
-            orig_song_path, vocals_path, instrumentals_path, main_vocals_path, backup_vocals_path, main_vocals_dereverb_path = preprocess_song(song_input, mdx_model_params, song_id, is_webui, input_type, progress)
+            orig_song_path, vocals_path, instrumentals_path, main_vocals_path, backup_vocals_path, main_vocals_dereverb_path = preprocess_song(song_input, song_id, is_webui, input_type, progress)
         else:
             vocals_path, main_vocals_path = None, None
             paths = get_audio_paths(song_dir)
 
             if any(path is None for path in paths) or keep_files:
-                orig_song_path, vocals_path, instrumentals_path, main_vocals_path, backup_vocals_path, main_vocals_dereverb_path = preprocess_song(song_input, mdx_model_params, song_id, is_webui, input_type, progress)
+                orig_song_path, vocals_path, instrumentals_path, main_vocals_path, backup_vocals_path, main_vocals_dereverb_path = preprocess_song(song_input, song_id, is_webui, input_type, progress)
             else:
                 orig_song_path, instrumentals_path, main_vocals_dereverb_path, backup_vocals_path = paths
 
@@ -243,7 +313,7 @@ def song_cover_pipeline(song_input, voice_model, pitch_change, keep_files, is_we
 
         if not os.path.exists(ai_vocals_path):
             display_progress('[~] Converting vocals...', 0.5, is_webui, progress)
-            voice_change(voice_model, main_vocals_dereverb_path, ai_vocals_path, pitch_change, f0_method, index_rate, 
+            voice_change(voice_model, main_vocals_dereverb_path, ai_vocals_path, pitch_change, f0_method, index_rate,
                          filter_radius, rms_mix_rate, protect, crepe_hop_length, f0autotune, f0_min, f0_max, is_webui)
 
         display_progress('[~] Combining AI vocals and instrumental...', 0.9, is_webui, progress)
@@ -264,7 +334,7 @@ def song_cover_pipeline(song_input, voice_model, pitch_change, keep_files, is_we
         raise_exception(str(e), is_webui)
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Generate a AI cover song in the song_output/id directory.', add_help=True)
+    parser = argparse.ArgumentParser(description='CoverGen V3.', add_help=True)
     parser.add_argument('-i', '--song-input', type=str, required=True, help='Link to a YouTube video or the filepath to a local mp3/wav file to create an AI cover of')
     parser.add_argument('-dir', '--rvc-dirname', type=str, required=True, help='Name of the folder in the rvc_models directory containing the RVC model file and optional index file to use')
     parser.add_argument('-p', '--pitch-change', type=int, required=True, help='Change the pitch of AI Vocals only. Generally, use 1 for male to female and -1 for vice-versa. (Octaves)')

@@ -12,9 +12,7 @@ from core import song_cover_pipeline
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-mdxnet_models_dir = os.path.join(BASE_DIR, 'mdxnet_models')
-rvc_models_dir = os.path.join(BASE_DIR, 'rvc_models')
-output_dir = os.path.join(BASE_DIR, 'song_output')
+rvc_models_dir = os.path.join(BASE_DIR, 'assets', 'rvc_models')
 
 def get_current_models(models_dir):
     models_list = os.listdir(models_dir)
@@ -118,7 +116,7 @@ def update_f0_method(use_hybrid_methods):
         return gr.update(choices=['rmvpe+', 'fcpe', 'rmvpe', 'mangio-crepe'], value='rmvpe+')
 
 if __name__ == '__main__':
-    parser = ArgumentParser(description='Generate a AI cover song in the song_output/id directory.', add_help=True)
+    parser = ArgumentParser(description='CoverGen V3.', add_help=True)
     parser.add_argument("--share", action="store_true", dest="share_enabled", default=False, help="Allow sharing")
     parser.add_argument("--listen", action="store_true", default=False, help="Make the WebUI accessible from your local network.")
     parser.add_argument('--listen-host', type=str, help='Hostname the server will use.')
@@ -128,6 +126,7 @@ if __name__ == '__main__':
     voice_models = get_current_models(rvc_models_dir)
 
     with gr.Blocks(title='CoverGen - AsukaDev') as app:
+    	gr.Label("CoverGen V3") 
         with gr.Tab("CoverGen"):
             with gr.Row():
                 with gr.Column():

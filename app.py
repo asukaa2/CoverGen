@@ -15,11 +15,10 @@ from fastapi.staticfiles import StaticFiles
 from gradio import Server
 from gradio.data_classes import FileData
 
-BASE_DIR = Path(__file__).resolve().parent
-SRC_DIR = BASE_DIR / 'src'
-STATIC_DIR = BASE_DIR / 'static'
-RVC_MODELS_DIR = BASE_DIR / 'rvc_models'
-OUTPUT_DIR = BASE_DIR / 'song_output'
+BASE_DIR = os.path.join(os.getcwd(), 'rvc'
+STATIC_DIR = os. path.join(BASE_DIR, 'static') 
+RVC_MODELS_DIR = os. path.join(BASE_DIR, 'rvc_models') 
+OUTPUT_DIR = os. path.join(BASE_DIR, 'song_output') 
 
 # The inference pipeline lives in src/ and uses intra-package imports.
 sys.path.insert(0, str(SRC_DIR))

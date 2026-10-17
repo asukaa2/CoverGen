@@ -8,12 +8,12 @@ import numpy as np
 from librosa import yin, pyin
 from scipy.signal import medfilt
 
-from predictor.RMVPE import RMVPE
-from predictor.FCPE import FCPE
-from predictor.PYWORLD import PYWORLD
-from predictor.CREPE import CREPE, mean, median
+from rvc.modules.predictor.RMVPE import RMVPE
+from rvc.modules.predictor.FCPE import FCPE
+from rvc.modules.predictor.PYWORLD import PYWORLD
+from rvc.modules.predictor.CREPE import CREPE, mean, median
 
-# Absolute directory that stores predictor/embedder model files (independent of CWD).
+# Absolute directory that stores rvc.modules.predictor/embedder model files (independent of CWD).
 MODELS_DIR = os.path.join(os.getcwd(), 'models')
 
 

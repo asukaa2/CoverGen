@@ -34,7 +34,9 @@ soundfile>=0.13.0
 pedalboard
 
 # Data processing and calculation
-numpy>=1.25.2
+# Numba requires NumPy <= 2.2 (as of numba 0.60). Pin numpy below 2.3 so
+# `from librosa import yin, pyin` doesn't crash on import.
+numpy>=1.25.2,<2.3
 numba>=0.57.0
 scipy>=1.15.0
 matplotlib>=3.7.2
